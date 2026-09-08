@@ -176,15 +176,18 @@ creates a `tournaments` row automatically once an event that looks sports-relate
 Approved with no expense. This page only manages tournaments that already exist; there was nothing
 to add here.
 
-- **`create_tournament_team()` is a genuinely broken RPC in the legacy migration history** — worth
-  flagging since it's a real bug, not a rewrite simplification. Migration `027a` sets its return
-  type to `jsonb`; migration `033` later does `create or replace function
-  public.create_tournament_team(...) returns public.tournament_teams` **without a preceding `drop
-  function`**, which Postgres rejects for a return-type change (error `42P13`). Applied
-  sequentially, `033`'s statement — and everything after it in the same transaction, including its
-  department-resolution backfill — would fail. This rewrite sidesteps the RPC entirely: team
-  creation goes through two direct inserts (`tournament_teams` then `tournament_registrations`),
-  which the existing RLS insert policies already allow for a user creating their own team. See
+- **`create_tournament_team()` was a genuinely broken RPC in the legacy migration history — now
+  fixed at the source.** Migration `027a` sets its return type to `jsonb`; migration `033`
+  originally did `create or replace function public.create_tournament_team(...) returns
+  public.tournament_teams` **without a preceding `drop function`**, which Postgres rejects for a
+  return-type change (error `42P13`, confirmed live while applying these migrations to a fresh
+  project). `033` now starts with `drop function if exists
+  public.create_tournament_team(text,text);` before its `create function`, matching the pattern
+  `027a` itself already used to fix the same class of problem — a one-line, behavior-preserving fix
+  to the migration file itself, not a workaround. This rewrite's client code still sidesteps the
+  RPC entirely regardless: team creation goes through two direct inserts (`tournament_teams` then
+  `tournament_registrations`), which the existing RLS insert policies already allow for a user
+  creating their own team — kept as-is since it works and avoids depending on this RPC at all. See
   `features/tournaments/useTournaments.ts`'s `createTeam()` for the exact reasoning. If the legacy
   app is still deployed somewhere, this bug is worth a real hotfix migration there independent of
   this rewrite.
@@ -441,6 +444,21 @@ Vercel proxy config `api/config.js` is no longer needed: this app reads Supabase
 `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` at build time instead of a serverless
 function, since the anon key is safe to ship to the client). Deploys natively on Vercel with zero
 extra config — no `vercel.json` rewrite rules needed, unlike the old SPA build.
+
+`NEXT_PUBLIC_*` env vars must be set in the hosting platform's project settings (e.g. Vercel →
+Settings → Environment Variables), not just a local `.env.local` — they're inlined at build time,
+so a redeploy is needed after adding/changing them. `src/lib/supabase.ts` falls back to a
+syntactically valid placeholder URL/key when they're unset so the build/prerender step doesn't
+crash; real Supabase calls fail loudly at runtime instead, with a console warning during the build.
+
+Applying `supabase/migrations/` in order (skip the byte-identical duplicate `001_rebuild_
+clubsphere.sql`) against a fresh project applies cleanly end-to-end — confirmed by actually doing
+so against a live project while building this rewrite, which surfaced and fixed two pre-existing
+issues in the migration files themselves (both now fixed at the source, not worked around):
+9 files (`027`–`033`, `035`, `036`) had a stray literal `\` as their first line (a harmless no-op
+psql meta-command, but a hard syntax error in a plain-SQL client like the Supabase SQL Editor), and
+`033`'s `create_tournament_team()` redefinition was missing the `drop function if exists` needed
+for its return-type change — see the Tournaments module notes above for that one.
 
 ## Project layout
 

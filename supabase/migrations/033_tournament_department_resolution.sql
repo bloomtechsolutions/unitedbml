@@ -14,7 +14,10 @@ where nullif(trim(coalesce(r.department,'')),'') is null
   );
 
 -- 2. Future team creators must use normalized Staff Master columns.
-create or replace function public.create_tournament_team(p_tournament_id text, p_team_name text)
+-- Must drop first: 027a defined this function as `returns jsonb`, and Postgres
+-- rejects changing a function's return type via `create or replace` (42P13).
+drop function if exists public.create_tournament_team(text, text);
+create function public.create_tournament_team(p_tournament_id text, p_team_name text)
 returns public.tournament_teams
 language plpgsql security definer set search_path=public as $$
 declare
