@@ -10,7 +10,7 @@ import type {
   MeetingRow,
 } from '../../types/database';
 import type { CommitteeMemberOption } from '../events/types';
-import type { MeetingWithChildren } from './types';
+import type { MeetingWithChildren, RequiredItem } from './types';
 
 function assemble(
   meetings: MeetingRow[],
@@ -221,6 +221,7 @@ export async function createEventFromAgendaItem(
   agenda: MeetingAgendaRow
 ) {
   const eventId = String(Date.now());
+  const requiredItems = (agenda.data as { requiredItems?: RequiredItem[] } | null)?.requiredItems ?? [];
   const { error: eventError } = await supabase.from('events').insert({
     id: eventId,
     name: agenda.title,
@@ -233,6 +234,7 @@ export async function createEventFromAgendaItem(
     source_agenda_id: agenda.id,
     source_agenda_title: agenda.title,
     source_agenda_outcome: agenda.outcome,
+    data: requiredItems.length ? { requiredItems } : {},
   } satisfies Partial<EventRow>);
   if (eventError) throw eventError;
 

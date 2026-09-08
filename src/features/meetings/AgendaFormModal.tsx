@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import type { CommitteeMemberOption } from '../events/types';
 import type { MeetingAgendaRow } from '../../types/database';
+import type { RequiredItem } from './types';
 
 interface Values {
   title: string;
@@ -12,9 +13,14 @@ interface Values {
   outcome: string;
   details: string;
   discussion: string;
+  requiredItems: RequiredItem[];
 }
 
-const EMPTY: Values = { title: '', owner: '', minutes_allocated: 10, outcome: '', details: '', discussion: '' };
+const EMPTY: Values = { title: '', owner: '', minutes_allocated: 10, outcome: '', details: '', discussion: '', requiredItems: [] };
+
+function emptyItem(): RequiredItem {
+  return { id: crypto.randomUUID(), description: '', category: '', estimatedAmount: 0, reimbursable: true };
+}
 
 interface Props {
   open: boolean;
@@ -33,6 +39,7 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
   useEffect(() => {
     if (!open) return;
     if (editing) {
+      const existingItems = (editing.data as { requiredItems?: RequiredItem[] } | null)?.requiredItems ?? [];
       setValues({
         title: editing.title,
         owner: editing.owner ?? '',
@@ -40,12 +47,23 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
         outcome: editing.outcome ?? '',
         details: editing.details ?? '',
         discussion: editing.discussion ?? '',
+        requiredItems: existingItems,
       });
     } else {
       setValues(EMPTY);
     }
     setError(null);
   }, [open, editing]);
+
+  const isEventOutcome = values.outcome === 'Create Event / Activity';
+
+  const updateItem = (id: string, patch: Partial<RequiredItem>) => {
+    setValues((v) => ({ ...v, requiredItems: v.requiredItems.map((it) => (it.id === id ? { ...it, ...patch } : it)) }));
+  };
+
+  const removeItem = (id: string) => {
+    setValues((v) => ({ ...v, requiredItems: v.requiredItems.filter((it) => it.id !== id) }));
+  };
 
   const handleSubmit = async () => {
     if (!values.title.trim()) {
@@ -55,6 +73,9 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
     setSaving(true);
     setError(null);
     try {
+      const cleanItems = values.requiredItems
+        .map((it) => ({ ...it, description: it.description.trim() }))
+        .filter((it) => it.description);
       await onSave({
         title: values.title.trim(),
         owner: values.owner || null,
@@ -63,6 +84,7 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
         details: values.details || null,
         discussion: values.discussion || null,
         sort_order: editing?.sort_order ?? nextSortOrder,
+        data: { ...(editing?.data ?? {}), requiredItems: cleanItems },
       });
       onClose();
     } catch (err) {
@@ -127,6 +149,53 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
           />
         </div>
       </div>
+
+      {isEventOutcome && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ub-ink-soft)', marginBottom: 4 }}>Items required for this event</div>
+          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ub-ink-faint)' }}>
+            Listed here so they carry onto the event, and pre-fill its Expense Request line items automatically.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {values.requiredItems.map((item) => (
+              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto auto', gap: 8, alignItems: 'center' }}>
+                <input
+                  placeholder="Item description"
+                  value={item.description}
+                  onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                />
+                <input
+                  placeholder="Category"
+                  value={item.category}
+                  onChange={(e) => updateItem(item.id, { category: e.target.value })}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Est. amount"
+                  value={item.estimatedAmount || ''}
+                  onChange={(e) => updateItem(item.id, { estimatedAmount: Number(e.target.value) })}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, whiteSpace: 'nowrap' }}>
+                  <input type="checkbox" checked={item.reimbursable} onChange={(e) => updateItem(item.id, { reimbursable: e.target.checked })} />
+                  Reimbursable
+                </label>
+                <button className="ub-btn ub-btn-danger" style={{ padding: '7px 10px', fontSize: 12 }} onClick={() => removeItem(item.id)}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            className="ub-btn ub-btn-ghost"
+            style={{ marginTop: 10, padding: '8px 14px', fontSize: 12.5 }}
+            onClick={() => setValues((v) => ({ ...v, requiredItems: [...v.requiredItems, emptyItem()] }))}
+          >
+            + Add item
+          </button>
+        </div>
+      )}
+
       {error && <div style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>{error}</div>}
       <div className="modal-actions">
         <button className="btn ghost" onClick={onClose} disabled={saving}>

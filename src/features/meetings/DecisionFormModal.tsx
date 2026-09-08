@@ -17,22 +17,32 @@ const EMPTY: Values = { decision_text: '', outcome: 'Approved', owner: '', agend
 interface Props {
   open: boolean;
   onClose: () => void;
+  editing?: MeetingDecisionRow | null;
+  defaultAgendaId?: string;
   agendaItems: MeetingAgendaRow[];
   coordinators: CommitteeMemberOption[];
   onSave: (payload: Partial<MeetingDecisionRow>) => Promise<void>;
 }
 
-export function DecisionFormModal({ open, onClose, agendaItems, coordinators, onSave }: Props) {
+export function DecisionFormModal({ open, onClose, editing, defaultAgendaId, agendaItems, coordinators, onSave }: Props) {
   const [values, setValues] = useState<Values>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
-      setValues(EMPTY);
-      setError(null);
+    if (!open) return;
+    if (editing) {
+      setValues({
+        decision_text: editing.decision_text,
+        outcome: editing.outcome ?? 'Approved',
+        owner: editing.owner ?? '',
+        agenda_id: editing.agenda_id ?? '',
+      });
+    } else {
+      setValues({ ...EMPTY, agenda_id: defaultAgendaId ?? '' });
     }
-  }, [open]);
+    setError(null);
+  }, [open, editing, defaultAgendaId]);
 
   const handleSubmit = async () => {
     if (!values.decision_text.trim()) {
@@ -43,6 +53,7 @@ export function DecisionFormModal({ open, onClose, agendaItems, coordinators, on
     setError(null);
     try {
       await onSave({
+        id: editing?.id,
         decision_text: values.decision_text.trim(),
         outcome: values.outcome || null,
         owner: values.owner || null,
@@ -57,7 +68,7 @@ export function DecisionFormModal({ open, onClose, agendaItems, coordinators, on
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Record Decision">
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit Decision' : 'Record Decision'}>
       <div className="form-grid">
         <div className="field full">
           <label>Decision</label>

@@ -13,6 +13,17 @@ export interface MeetingWithChildren extends MeetingRow {
   actions: MeetingActionRow[];
 }
 
+/** An item the event being created from this agenda item will need — carried onto the
+ * event's `data.requiredItems` when the event is created, then pre-filled as expense
+ * lines when an Expense Request is later raised for that event. */
+export interface RequiredItem {
+  id: string;
+  description: string;
+  category: string;
+  estimatedAmount: number;
+  reimbursable: boolean;
+}
+
 export const MEETING_TYPES = [
   'EXCO Meeting',
   'Planning Meeting',

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
 import type { CommitteeMemberOption } from '../events/types';
-import type { MeetingActionRow } from '../../types/database';
+import type { MeetingActionRow, MeetingAgendaRow } from '../../types/database';
 import { localTodayIso } from './status';
 import { ACTION_PRIORITIES, ACTION_STATUSES } from './types';
 
@@ -16,6 +16,7 @@ interface Values {
   status: string;
   remarks: string;
   event_id: string;
+  agenda_id: string;
 }
 
 function addDaysIso(days: number): string {
@@ -32,17 +33,20 @@ const EMPTY: Values = {
   status: 'Open',
   remarks: '',
   event_id: '',
+  agenda_id: '',
 };
 
 interface Props {
   open: boolean;
   onClose: () => void;
   editing: MeetingActionRow | null;
+  defaultAgendaId?: string;
+  agendaItems: MeetingAgendaRow[];
   coordinators: CommitteeMemberOption[];
   onSave: (payload: Partial<MeetingActionRow>, statusChanged: boolean) => Promise<void>;
 }
 
-export function ActionFormModal({ open, onClose, editing, coordinators, onSave }: Props) {
+export function ActionFormModal({ open, onClose, editing, defaultAgendaId, agendaItems, coordinators, onSave }: Props) {
   const [values, setValues] = useState<Values>(EMPTY);
   const [events, setEvents] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -65,12 +69,13 @@ export function ActionFormModal({ open, onClose, editing, coordinators, onSave }
         status: editing.status,
         remarks: editing.remarks ?? '',
         event_id: editing.event_id ?? '',
+        agenda_id: editing.agenda_id ?? '',
       });
     } else {
-      setValues(EMPTY);
+      setValues({ ...EMPTY, agenda_id: defaultAgendaId ?? '' });
     }
     setError(null);
-  }, [open, editing]);
+  }, [open, editing, defaultAgendaId]);
 
   const handleSubmit = async () => {
     if (!values.action_text.trim()) {
@@ -92,6 +97,7 @@ export function ActionFormModal({ open, onClose, editing, coordinators, onSave }
           done: values.status === 'Completed',
           remarks: values.remarks || null,
           event_id: values.event_id || null,
+          agenda_id: values.agenda_id || null,
         },
         editing ? editing.status !== values.status : false
       );
@@ -144,6 +150,17 @@ export function ActionFormModal({ open, onClose, editing, coordinators, onSave }
             {ACTION_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field full">
+          <label>Related Agenda Item</label>
+          <select value={values.agenda_id} onChange={(e) => setValues((v) => ({ ...v, agenda_id: e.target.value }))}>
+            <option value="">None</option>
+            {agendaItems.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.title}
               </option>
             ))}
           </select>

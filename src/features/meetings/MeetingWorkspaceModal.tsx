@@ -49,8 +49,10 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
   const [agendaModalOpen, setAgendaModalOpen] = useState(false);
   const [editingAgenda, setEditingAgenda] = useState<MeetingAgendaRow | null>(null);
   const [decisionModalOpen, setDecisionModalOpen] = useState(false);
+  const [editingDecision, setEditingDecision] = useState<MeetingDecisionRow | null>(null);
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [editingAction, setEditingAction] = useState<MeetingActionRow | null>(null);
+  const [quickAddAgendaId, setQuickAddAgendaId] = useState<string | undefined>(undefined);
   const toast = useToast();
 
   if (!meeting) return null;
@@ -208,50 +210,116 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {meeting.agenda.map((item) => (
-              <div key={item.id} className="ub-card" style={{ padding: '16px 18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 14.5, fontWeight: 700 }}>{item.title}</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                      {item.carry_forward && <span className="ub-pill ub-pill-warning">Needs Discussion</span>}
-                      {item.owner && <span className="ub-pill ub-pill-neutral">{item.owner}</span>}
-                      {item.outcome && <span className="ub-pill ub-pill-neutral">{item.outcome}</span>}
-                      {item.outcome === 'Create Event / Activity' && !item.created_event_id && (
-                        <span className="ub-pill ub-pill-warning">Pending Event Creation</span>
-                      )}
-                      {item.created_event_id && <span className="ub-pill ub-pill-success">Event Created ✓</span>}
+            {meeting.agenda.map((item) => {
+              const requiredItems = (item.data as { requiredItems?: { id: string; description: string; category: string; estimatedAmount: number; reimbursable: boolean }[] } | null)?.requiredItems ?? [];
+              const itemDecisions = meeting.decisions.filter((d) => d.agenda_id === item.id);
+              const itemActions = meeting.actions.filter((a) => a.agenda_id === item.id);
+              return (
+                <div key={item.id} className="ub-card" style={{ padding: '16px 18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 14.5, fontWeight: 700 }}>{item.title}</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                        {item.carry_forward && <span className="ub-pill ub-pill-warning">Needs Discussion</span>}
+                        {item.owner && <span className="ub-pill ub-pill-neutral">{item.owner}</span>}
+                        {item.outcome && <span className="ub-pill ub-pill-neutral">{item.outcome}</span>}
+                        {item.outcome === 'Create Event / Activity' && !item.created_event_id && (
+                          <span className="ub-pill ub-pill-warning">Pending Event Creation</span>
+                        )}
+                        {item.created_event_id && <span className="ub-pill ub-pill-success">Event Created ✓</span>}
+                      </div>
+                      {item.discussion && <p style={{ fontSize: 12.5, color: 'var(--ub-ink-soft)', margin: '10px 0 0', lineHeight: 1.5 }}>{item.discussion}</p>}
                     </div>
-                    {item.discussion && <p style={{ fontSize: 12.5, color: 'var(--ub-ink-soft)', margin: '10px 0 0', lineHeight: 1.5 }}>{item.discussion}</p>}
+                  </div>
+
+                  {requiredItems.length > 0 && (
+                    <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--ub-surface-2)', borderRadius: 10 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ub-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>
+                        Items required for this event
+                      </div>
+                      {requiredItems.map((ri) => (
+                        <div key={ri.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '3px 0' }}>
+                          <span>
+                            {ri.description} {ri.category && <span style={{ color: 'var(--ub-ink-faint)' }}>· {ri.category}</span>}
+                          </span>
+                          <span style={{ color: 'var(--ub-ink-faint)' }}>{ri.estimatedAmount ? `MVR ${ri.estimatedAmount}` : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(itemDecisions.length > 0 || itemActions.length > 0) && (
+                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {itemDecisions.map((d) => (
+                        <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                          <span className={`ub-pill ${d.outcome === 'Approved' ? 'ub-pill-success' : 'ub-pill-accent'}`} style={{ padding: '2px 9px', fontSize: 10.5 }}>
+                            Decision
+                          </span>
+                          {d.decision_text}
+                        </div>
+                      ))}
+                      {itemActions.map((a) => (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                          <span className="ub-pill ub-pill-neutral" style={{ padding: '2px 9px', fontSize: 10.5 }}>
+                            Action · {a.status}
+                          </span>
+                          {a.action_text}
+                          {a.assigned_to && <span style={{ color: 'var(--ub-ink-faint)' }}>— {a.assigned_to}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                    <button
+                      className="ub-btn ub-btn-ghost"
+                      style={{ padding: '7px 14px', fontSize: 12.5 }}
+                      onClick={() => {
+                        setEditingAgenda(item);
+                        setAgendaModalOpen(true);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    {item.outcome === 'Create Event / Activity' && !item.created_event_id && (
+                      <button
+                        className="ub-btn"
+                        style={{ padding: '7px 14px', fontSize: 12.5, background: 'var(--ub-accent-soft)', color: 'var(--ub-accent-dark)' }}
+                        onClick={() => void handleCreateEvent(item)}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ub-accent-dark)" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
+                        Create Event
+                      </button>
+                    )}
+                    <button
+                      className="ub-btn ub-btn-ghost"
+                      style={{ padding: '7px 14px', fontSize: 12.5 }}
+                      onClick={() => {
+                        setEditingDecision(null);
+                        setQuickAddAgendaId(item.id);
+                        setDecisionModalOpen(true);
+                      }}
+                    >
+                      + Decision
+                    </button>
+                    <button
+                      className="ub-btn ub-btn-ghost"
+                      style={{ padding: '7px 14px', fontSize: 12.5 }}
+                      onClick={() => {
+                        setEditingAction(null);
+                        setQuickAddAgendaId(item.id);
+                        setActionModalOpen(true);
+                      }}
+                    >
+                      + Action
+                    </button>
+                    <button className="ub-btn ub-btn-danger" style={{ padding: '7px 14px', fontSize: 12.5 }} onClick={() => void handleDeleteAgenda(item)}>
+                      Delete
+                    </button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                  <button
-                    className="ub-btn ub-btn-ghost"
-                    style={{ padding: '7px 14px', fontSize: 12.5 }}
-                    onClick={() => {
-                      setEditingAgenda(item);
-                      setAgendaModalOpen(true);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  {item.outcome === 'Create Event / Activity' && !item.created_event_id && (
-                    <button
-                      className="ub-btn"
-                      style={{ padding: '7px 14px', fontSize: 12.5, background: 'var(--ub-accent-soft)', color: 'var(--ub-accent-dark)' }}
-                      onClick={() => void handleCreateEvent(item)}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ub-accent-dark)" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
-                      Create Event
-                    </button>
-                  )}
-                  <button className="ub-btn ub-btn-danger" style={{ padding: '7px 14px', fontSize: 12.5 }} onClick={() => void handleDeleteAgenda(item)}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {!meeting.agenda.length && <p className="ub-empty">No agenda items yet.</p>}
           </div>
         </div>
@@ -287,7 +355,14 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
       {tab === 'decisions' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-            <button className="ub-btn ub-btn-primary" onClick={() => setDecisionModalOpen(true)}>
+            <button
+              className="ub-btn ub-btn-primary"
+              onClick={() => {
+                setEditingDecision(null);
+                setQuickAddAgendaId(undefined);
+                setDecisionModalOpen(true);
+              }}
+            >
               + Record Decision
             </button>
           </div>
@@ -308,7 +383,18 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                     <span className={`ub-pill ${d.outcome === 'Approved' ? 'ub-pill-success' : 'ub-pill-accent'}`}>{d.outcome}</span>
                   </td>
                   <td>{d.owner || '—'}</td>
-                  <td>
+                  <td style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="ub-btn ub-btn-ghost"
+                      style={{ padding: '6px 12px', fontSize: 12 }}
+                      onClick={() => {
+                        setEditingDecision(d);
+                        setQuickAddAgendaId(undefined);
+                        setDecisionModalOpen(true);
+                      }}
+                    >
+                      Edit
+                    </button>
                     <button className="ub-btn ub-btn-danger" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => void handleDeleteDecision(d)}>
                       Delete
                     </button>
@@ -334,6 +420,7 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
               className="ub-btn ub-btn-primary"
               onClick={() => {
                 setEditingAction(null);
+                setQuickAddAgendaId(undefined);
                 setActionModalOpen(true);
               }}
             >
@@ -421,6 +508,8 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
       <DecisionFormModal
         open={decisionModalOpen}
         onClose={() => setDecisionModalOpen(false)}
+        editing={editingDecision}
+        defaultAgendaId={quickAddAgendaId}
         agendaItems={meeting.agenda}
         coordinators={coordinators}
         onSave={handleSaveDecision}
@@ -429,6 +518,8 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
         open={actionModalOpen}
         onClose={() => setActionModalOpen(false)}
         editing={editingAction}
+        defaultAgendaId={quickAddAgendaId}
+        agendaItems={meeting.agenda}
         coordinators={coordinators}
         onSave={handleSaveAction}
       />
