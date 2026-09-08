@@ -18,6 +18,8 @@ interface Values {
 
 const EMPTY: Values = { title: '', owner: '', minutes_allocated: 10, outcome: '', details: '', discussion: '', requiredItems: [] };
 
+const STANDARD_OUTCOMES = ['', 'Approved', 'Noted', 'Deferred', 'Rejected', 'Create Event / Activity'];
+
 function emptyItem(): RequiredItem {
   return { id: crypto.randomUUID(), description: '', category: '', estimatedAmount: 0, reimbursable: true };
 }
@@ -55,6 +57,8 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
     setError(null);
   }, [open, editing]);
 
+  const isCustomOutcome = !STANDARD_OUTCOMES.includes(values.outcome);
+
   const updateItem = (id: string, patch: Partial<RequiredItem>) => {
     setValues((v) => ({ ...v, requiredItems: v.requiredItems.map((it) => (it.id === id ? { ...it, ...patch } : it)) }));
   };
@@ -78,7 +82,7 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
         title: values.title.trim(),
         owner: values.owner || null,
         minutes_allocated: Number(values.minutes_allocated) || 0,
-        outcome: values.outcome || null,
+        outcome: values.outcome.trim() || null,
         details: values.details || null,
         discussion: values.discussion || null,
         sort_order: editing?.sort_order ?? nextSortOrder,
@@ -121,19 +125,26 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
         </div>
         <div className="field full">
           <label>Outcome</label>
-          <input
-            list="agenda-outcomes"
-            value={values.outcome}
-            onChange={(e) => setValues((v) => ({ ...v, outcome: e.target.value }))}
-            placeholder="e.g. Approved, Noted, Create Event / Activity"
-          />
-          <datalist id="agenda-outcomes">
-            <option value="Approved" />
-            <option value="Noted" />
-            <option value="Deferred" />
-            <option value="Rejected" />
-            <option value="Create Event / Activity" />
-          </datalist>
+          <select
+            value={isCustomOutcome ? 'Other' : values.outcome}
+            onChange={(e) => setValues((v) => ({ ...v, outcome: e.target.value === 'Other' ? ' ' : e.target.value }))}
+          >
+            <option value="">Not decided yet</option>
+            <option value="Approved">Approved</option>
+            <option value="Noted">Noted</option>
+            <option value="Deferred">Deferred</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Create Event / Activity">Create Event / Activity</option>
+            <option value="Other">Other…</option>
+          </select>
+          {isCustomOutcome && (
+            <input
+              style={{ marginTop: 8 }}
+              placeholder="Describe the outcome"
+              value={values.outcome.trim()}
+              onChange={(e) => setValues((v) => ({ ...v, outcome: e.target.value }))}
+            />
+          )}
         </div>
         <div className="field full">
           <label>Details</label>
