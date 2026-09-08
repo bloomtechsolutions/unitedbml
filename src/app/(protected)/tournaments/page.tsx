@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function tournamentsPage() {
-  return <Placeholder title="Tournaments" />;
+import { TournamentsPage } from '../../../features/tournaments/TournamentsPage';
+
+export default function TournamentsRoute() {
+  return <TournamentsPage />;
 }

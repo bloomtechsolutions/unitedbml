@@ -24,7 +24,7 @@ preserves the original business logic before moving to the next.
 | Meetings | ✅ Migrated (agenda, attendance, decisions, actions, minutes, agenda→Event creation) |
 | Finance | ✅ Migrated (requests, President/Final approval chain, reversals, budget tracking) — Contingency deferred, see below |
 | Reimbursements | ✅ Migrated (Procurement pre-approval, exceptions, AP batches/bills, vendor master, status tracking) |
-| Tournaments | ⏳ Not yet migrated — placeholder page |
+| Tournaments | ✅ Migrated (registration/teams, matches, live screen, results & department stats) — see below for a real DB bug found and worked around |
 | Leaderboard | ⏳ Not yet migrated — placeholder page |
 | Communication | ⏳ Not yet migrated — placeholder page |
 | Documents | ⏳ Not yet migrated — placeholder page |
@@ -161,6 +161,49 @@ was not ported; only the real, reachable `data-view="reimbursements"` module was
   two tables, to avoid a schema migration — `features/reimbursements/types.ts`'s
   `ProcurementGroupCase` documents the distinction in code instead.
 
+### Known simplifications vs. the legacy build (Tournaments module)
+
+Tournaments are still **auto-provisioned only** — this rewrite has no "create tournament" UI,
+matching the legacy build exactly: a DB trigger (`supabase/migrations/022_simple_tournament_module.sql`)
+creates a `tournaments` row automatically once an event that looks sports-related (regex over
+`event_type`/name, or `events.data->>'isTournament'`) gets an approved expense, or is itself
+Approved with no expense. This page only manages tournaments that already exist; there was nothing
+to add here.
+
+- **`create_tournament_team()` is a genuinely broken RPC in the legacy migration history** — worth
+  flagging since it's a real bug, not a rewrite simplification. Migration `027a` sets its return
+  type to `jsonb`; migration `033` later does `create or replace function
+  public.create_tournament_team(...) returns public.tournament_teams` **without a preceding `drop
+  function`**, which Postgres rejects for a return-type change (error `42P13`). Applied
+  sequentially, `033`'s statement — and everything after it in the same transaction, including its
+  department-resolution backfill — would fail. This rewrite sidesteps the RPC entirely: team
+  creation goes through two direct inserts (`tournament_teams` then `tournament_registrations`),
+  which the existing RLS insert policies already allow for a user creating their own team. See
+  `features/tournaments/useTournaments.ts`'s `createTeam()` for the exact reasoning. If the legacy
+  app is still deployed somewhere, this bug is worth a real hotfix migration there independent of
+  this rewrite.
+- **Team-leader reject permission**: migration `026` explicitly makes leaders "approve-only"
+  (rejecting requires a non-leader Committee member) — but migration `027` (later) redefines the
+  same `approve_tournament_team_request(text,text)` function *without* that restriction, while
+  adding an eligibility re-check on approval. Since migrations apply in order, `027`'s version is
+  what's actually live, and that's what this rewrite follows: both the team leader and Committee
+  can approve or reject. The `026` "approve-only" rule described in earlier research on this module
+  is a superseded intent, not the current behavior.
+- **No bracket/fixture generator** — matches are entered one at a time by Committee, exactly like
+  the legacy build (there was never auto-fixture logic to port).
+- **Registration + Teams tabs are merged into one "Registration & Teams" tab** (legacy has them
+  separate). Functionally identical, just fewer tabs to click through.
+- **Participant Portal self-service** (staff registering for a tournament through the general Event
+  browsing UI, rather than through this dedicated Tournaments page) is not implemented — the
+  Portal itself is still unmigrated. When it is, it should call the same
+  `createTeam`/`requestJoinTeam`/`selfRegisterIndividual` logic (or the underlying RPCs/inserts)
+  rather than duplicating tournament registration logic, since the legacy build's Portal and
+  Tournaments-section registration flows share one backend surface.
+- **`tournament_team_messages` (private team chat)** is realtime-capable at the DB level
+  (`supabase_realtime` publication includes it) but this rewrite polls on reload rather than
+  subscribing to realtime updates — a reasonable follow-up once a broader realtime pattern is
+  wanted across the app.
+
 ## Getting started
 
 ```bash
@@ -199,6 +242,7 @@ src/
     meetings/         Meetings module (fully migrated)
     finance/          Finance module (core expense/approval lifecycle; Contingency deferred)
     reimbursements/   Reimbursements/AP module (no email dispatch; see notes above)
+    tournaments/      Tournaments module (auto-provisioned only, no create UI)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)

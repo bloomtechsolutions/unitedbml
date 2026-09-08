@@ -97,6 +97,15 @@ export interface EventRow {
   source_agenda_title: string | null;
   source_agenda_outcome: string | null;
   created_by: string | null;
+  audience_type: string;
+  registration_enabled: boolean;
+  registration_mode: string;
+  registration_open_at: string | null;
+  registration_close_at: string | null;
+  participant_rules: string | null;
+  participant_capacity: number | null;
+  team_size: number | null;
+  participant_visibility: string;
   data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -448,6 +457,113 @@ export interface VendorMasterRow {
   updated_at: string;
 }
 
+export interface TournamentRow {
+  id: string;
+  event_id: string;
+  source_expense_request_id: string | null;
+  name: string;
+  tournament_mode: string;
+  sport: string | null;
+  rules: string | null;
+  status: string;
+  registration_open: string | null;
+  registration_close: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  venue: string | null;
+  max_participants: number | null;
+  max_teams: number | null;
+  team_size: number | null;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentTeamRow {
+  id: string;
+  tournament_id: string;
+  team_name: string;
+  join_code: string;
+  leader_user_id: string;
+  leader_uid: string | null;
+  leader_name: string;
+  leader_email: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentRegistrationRow {
+  id: string;
+  tournament_id: string;
+  user_id: string;
+  staff_uid: string | null;
+  staff_name: string;
+  email: string | null;
+  contact_no: string | null;
+  department: string | null;
+  registration_type: string;
+  team_id: string | null;
+  status: string;
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  data: Record<string, unknown>;
+}
+
+export interface TournamentTeamMessageRow {
+  id: string;
+  tournament_id: string;
+  team_id: string;
+  user_id: string;
+  sender_name: string;
+  message: string;
+  created_at: string;
+}
+
+export interface TournamentUpdateRow {
+  id: string;
+  tournament_id: string;
+  update_type: string;
+  title: string;
+  message: string;
+  is_pinned: boolean;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export interface TournamentMatchRow {
+  id: string;
+  tournament_id: string;
+  match_no: number | null;
+  stage: string | null;
+  match_date: string | null;
+  match_time: string | null;
+  venue: string | null;
+  team_a: string | null;
+  team_b: string | null;
+  participant_a: string | null;
+  participant_b: string | null;
+  score_a: number | null;
+  score_b: number | null;
+  status: string;
+  remarks: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentWinnerRow {
+  id: string;
+  tournament_id: string;
+  position: string;
+  winner_name: string;
+  team_id: string | null;
+  staff_uid: string | null;
+  remarks: string | null;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -515,6 +631,33 @@ export interface Database {
       ap_batches: { Row: ApBatchRow; Insert: Partial<ApBatchRow>; Update: Partial<ApBatchRow> };
       ap_bills: { Row: ApBillRow; Insert: Partial<ApBillRow>; Update: Partial<ApBillRow> };
       vendor_master: { Row: VendorMasterRow; Insert: Partial<VendorMasterRow>; Update: Partial<VendorMasterRow> };
+      tournaments: { Row: TournamentRow; Insert: Partial<TournamentRow>; Update: Partial<TournamentRow> };
+      tournament_teams: { Row: TournamentTeamRow; Insert: Partial<TournamentTeamRow>; Update: Partial<TournamentTeamRow> };
+      tournament_registrations: {
+        Row: TournamentRegistrationRow;
+        Insert: Partial<TournamentRegistrationRow>;
+        Update: Partial<TournamentRegistrationRow>;
+      };
+      tournament_team_messages: {
+        Row: TournamentTeamMessageRow;
+        Insert: Partial<TournamentTeamMessageRow>;
+        Update: Partial<TournamentTeamMessageRow>;
+      };
+      tournament_updates: {
+        Row: TournamentUpdateRow;
+        Insert: Partial<TournamentUpdateRow>;
+        Update: Partial<TournamentUpdateRow>;
+      };
+      tournament_matches: {
+        Row: TournamentMatchRow;
+        Insert: Partial<TournamentMatchRow>;
+        Update: Partial<TournamentMatchRow>;
+      };
+      tournament_winners: {
+        Row: TournamentWinnerRow;
+        Insert: Partial<TournamentWinnerRow>;
+        Update: Partial<TournamentWinnerRow>;
+      };
     };
   };
 }
