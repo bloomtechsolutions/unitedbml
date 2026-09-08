@@ -32,7 +32,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Engagement',
-    items: [{ to: '/leaderboard', icon: '◈', label: 'Leaderboard' }],
+    items: [
+      { to: '/leaderboard', icon: '◈', label: 'Leaderboard' },
+      { to: '/portal', icon: '⛨', label: 'Participant Portal' },
+    ],
   },
   {
     label: 'Management',

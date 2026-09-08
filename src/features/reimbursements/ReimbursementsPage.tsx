@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useToast } from '../../lib/ToastContext';
+import { decideExternalReimbursement, usePendingExternalReimbursements } from '../portal/usePortal';
 import { ApBatchModal } from './ApBatchModal';
 import { ApStatusModal } from './ApStatusModal';
 import { ExceptionModal } from './ExceptionModal';
@@ -10,14 +11,16 @@ import { ProcurementResponseModal } from './ProcurementResponseModal';
 import type { ApBatchWithBills, EligibleExpenseLine, EligibleExpenseRequest, ProcurementGroupCase } from './types';
 import { apSubmittedTotal, useEligibleExpenseRequests, useReimbursementCases } from './useReimbursements';
 
-type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions';
+type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'external';
 
 export function ReimbursementsPage() {
   const { cases, batches, loading, error, reload } = useReimbursementCases();
   const { eligible, loading: eligibleLoading } = useEligibleExpenseRequests(cases);
+  const { items: pendingExternal, loading: externalLoading, reload: reloadExternal } = usePendingExternalReimbursements();
   const toast = useToast();
 
   const [subTab, setSubTab] = useState<SubTab>('cases');
+  const [decidingId, setDecidingId] = useState<string | null>(null);
   const [groupTarget, setGroupTarget] = useState<EligibleExpenseRequest | null>(null);
   const [exceptionTarget, setExceptionTarget] = useState<EligibleExpenseLine | null>(null);
   const [respondingGroup, setRespondingGroup] = useState<ProcurementGroupCase | null>(null);
@@ -37,7 +40,21 @@ export function ReimbursementsPage() {
     await reload();
   };
 
-  if (loading || eligibleLoading) return <div>Loading reimbursements…</div>;
+  const decideExternal = async (id: string, approve: boolean) => {
+    setDecidingId(id);
+    try {
+      await decideExternalReimbursement(id, approve);
+      toast(approve ? 'Reimbursement approved and released to AP' : 'Reimbursement rejected');
+      await reloadExternal();
+      await refresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to decide reimbursement.');
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  if (loading || eligibleLoading || externalLoading) return <div>Loading reimbursements…</div>;
   if (error) return <div style={{ color: 'var(--danger)' }}>Failed to load reimbursements: {error}</div>;
 
   return (
@@ -88,6 +105,9 @@ export function ReimbursementsPage() {
         </button>
         <button className={`tab ${subTab === 'exceptions' ? 'active' : ''}`} onClick={() => setSubTab('exceptions')}>
           Exceptions ({exceptions.length})
+        </button>
+        <button className={`tab ${subTab === 'external' ? 'active' : ''}`} onClick={() => setSubTab('external')}>
+          External Officials ({pendingExternal.length})
         </button>
       </div>
 
@@ -300,6 +320,36 @@ export function ReimbursementsPage() {
             )}
           </tbody>
         </table>
+      )}
+
+      {subTab === 'external' && (
+        <div>
+          {pendingExternal.map((r) => (
+            <div className="external-approval-row" key={r.id}>
+              <div>
+                <b>{r.title}</b>
+                <small>
+                  {r.vendor_name || 'No vendor'} · {r.expense_date} · {r.reference_no || 'No reference'}
+                </small>
+              </div>
+              <div>${r.amount.toFixed(2)}</div>
+              <div>{r.official_role || 'Official'}</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn ghost" disabled={decidingId === r.id} onClick={() => void decideExternal(r.id, false)}>
+                  Reject
+                </button>
+                <button className="btn primary" disabled={decidingId === r.id} onClick={() => void decideExternal(r.id, true)}>
+                  Approve
+                </button>
+              </div>
+            </div>
+          ))}
+          {!pendingExternal.length && (
+            <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 20 }}>
+              No External Event Official reimbursements awaiting approval.
+            </div>
+          )}
+        </div>
       )}
 
       <ProcurementGroupModal

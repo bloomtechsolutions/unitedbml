@@ -576,6 +576,103 @@ export interface StaffLocationClassificationRow {
   updated_at: string;
 }
 
+export interface EventTeamRow {
+  id: string;
+  event_id: string;
+  team_name: string;
+  leader_user_id: string;
+  leader_name: string | null;
+  leader_email: string | null;
+  join_code: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventRegistrationRow {
+  id: string;
+  event_id: string;
+  user_id: string;
+  staff_uid: string | null;
+  staff_name: string | null;
+  email: string | null;
+  contact_no: string | null;
+  department: string | null;
+  registration_type: string;
+  team_id: string | null;
+  status: string;
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  data: Record<string, unknown>;
+}
+
+export interface EventTeamMessageRow {
+  id: string;
+  event_id: string;
+  team_id: string;
+  user_id: string;
+  sender_name: string | null;
+  message: string;
+  created_at: string;
+}
+
+export interface EventWinnerRow {
+  id: string;
+  event_id: string;
+  position: string;
+  winner_name: string;
+  team_id: string | null;
+  staff_uid: string | null;
+  remarks: string | null;
+  created_at: string;
+}
+
+export interface ExternalEventOfficialRow {
+  id: string;
+  event_id: string;
+  user_id: string;
+  official_role: string;
+  notes: string | null;
+  status: string;
+  assigned_by: string | null;
+  assigned_at: string;
+}
+
+export interface ExternalEventReimbursementRow {
+  id: string;
+  event_id: string;
+  official_user_id: string;
+  official_role: string | null;
+  title: string;
+  description: string | null;
+  expense_date: string;
+  vendor_name: string | null;
+  reference_no: string | null;
+  amount: number;
+  supporting_document_name: string | null;
+  status: string;
+  committee_comment: string | null;
+  approved_by: string | null;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  reimbursement_case_id: string | null;
+  created_at: string;
+  updated_at: string;
+  data: Record<string, unknown>;
+}
+
+export interface ExternalReimbursementHistoryRow {
+  id: string;
+  external_reimbursement_id: string;
+  action: string;
+  remarks: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  created_at: string;
+}
+
 export interface DocumentRegistryRow {
   id: string;
   title: string;
@@ -699,6 +796,33 @@ export interface Database {
         Row: DocumentRegistryRow;
         Insert: Partial<DocumentRegistryRow>;
         Update: Partial<DocumentRegistryRow>;
+      };
+      event_teams: { Row: EventTeamRow; Insert: Partial<EventTeamRow>; Update: Partial<EventTeamRow> };
+      event_registrations: {
+        Row: EventRegistrationRow;
+        Insert: Partial<EventRegistrationRow>;
+        Update: Partial<EventRegistrationRow>;
+      };
+      event_team_messages: {
+        Row: EventTeamMessageRow;
+        Insert: Partial<EventTeamMessageRow>;
+        Update: Partial<EventTeamMessageRow>;
+      };
+      event_winners: { Row: EventWinnerRow; Insert: Partial<EventWinnerRow>; Update: Partial<EventWinnerRow> };
+      external_event_officials: {
+        Row: ExternalEventOfficialRow;
+        Insert: Partial<ExternalEventOfficialRow>;
+        Update: Partial<ExternalEventOfficialRow>;
+      };
+      external_event_reimbursements: {
+        Row: ExternalEventReimbursementRow;
+        Insert: Partial<ExternalEventReimbursementRow>;
+        Update: Partial<ExternalEventReimbursementRow>;
+      };
+      external_reimbursement_history: {
+        Row: ExternalReimbursementHistoryRow;
+        Insert: Partial<ExternalReimbursementHistoryRow>;
+        Update: Partial<ExternalReimbursementHistoryRow>;
       };
     };
   };

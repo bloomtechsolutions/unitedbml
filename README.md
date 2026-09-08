@@ -31,7 +31,7 @@ preserves the original business logic before moving to the next.
 | Reports | ✅ Migrated (all 15 catalog reports — filters, CSV export, print) |
 | Settings | ✅ Migrated (profile self-service, My Committee Leave, password change, session management) |
 | Communication | ❌ Removed from scope (product decision — not part of this rewrite) |
-| Participant Portal | ⏳ Not yet migrated |
+| Participant Portal | ✅ Migrated (activities, team self-registration, engagement, External Official reimbursements) |
 
 The legacy `index.html` build (fully functional, all modules) is kept under `legacy-reference/`
 purely as a source-of-truth reference while the rest of the modules are ported — it is not served
@@ -152,9 +152,11 @@ was not ported; only the real, reachable `data-view="reimbursements"` module was
   here since there's no actual async email step to protect against yet — this can be revisited
   once real sending is added.
 - **External Event Official self-service reimbursements** (`external_event_reimbursements`, the
-  RPCs `submit_external_event_reimbursement`/`decide_external_event_reimbursement`, and the
-  approval card that surfaces them at the top of the Reimbursements page) are not ported — they
-  belong to the not-yet-migrated Participant Portal.
+  RPCs `submit_external_event_reimbursement`/`decide_external_event_reimbursement`) are submitted
+  from the Participant Portal's "My Reimbursements" tab; the Committee approval queue for them is
+  ported here as the "External Officials" sub-tab (`external-approval-row` cards, matching legacy's
+  `#externalReimbursementApprovalCard`) — see the Participant Portal section below for the
+  submission side.
 - **Reports tab** (CSV export, print-friendly summary report) is not ported.
 - **Event-actuals reconciliation** (`event_actual_expenses`, matching `Paid` AP bill totals back
   onto approved expense lines so Events' post-event settlement shows real actuals) is not wired up
@@ -197,12 +199,14 @@ to add here.
   the legacy build (there was never auto-fixture logic to port).
 - **Registration + Teams tabs are merged into one "Registration & Teams" tab** (legacy has them
   separate). Functionally identical, just fewer tabs to click through.
-- **Participant Portal self-service** (staff registering for a tournament through the general Event
-  browsing UI, rather than through this dedicated Tournaments page) is not implemented — the
-  Portal itself is still unmigrated. When it is, it should call the same
-  `createTeam`/`requestJoinTeam`/`selfRegisterIndividual` logic (or the underlying RPCs/inserts)
-  rather than duplicating tournament registration logic, since the legacy build's Portal and
-  Tournaments-section registration flows share one backend surface.
+- **Participant Portal self-service for Tournament-linked events is scoped down, not duplicated.**
+  Legacy's Portal transparently merges plain-`events` registrations with `tournaments`-table
+  registrations so a participant sees one unified list regardless of which table backs a given
+  activity. This rewrite's Portal (`src/features/portal/`) only manages the plain `event_teams`/
+  `event_registrations` path; for an event with a linked Tournament, participants register from
+  this Tournaments page instead (which already has the full self-service flow via
+  `createTeam`/`requestJoinTeam`/`selfRegisterIndividual`). Fully unifying the two lists in the
+  Portal UI is a reasonable follow-up, not done here to avoid duplicating this page's logic.
 - **`tournament_team_messages` (private team chat)** is realtime-capable at the DB level
   (`supabase_realtime` publication includes it) but this rewrite polls on reload rather than
   subscribing to realtime updates — a reasonable follow-up once a broader realtime pattern is
@@ -363,6 +367,60 @@ auto-summed KPI strip over the first 4 numeric/money columns.
 - **"Sign Out Other Sessions"** uses Supabase Auth's `signOut({ scope: 'others' })`, equivalent to
   legacy's same-purpose action.
 
+### Known simplifications vs. the legacy build (Participant Portal module)
+
+Legacy's Participant Portal (`legacy-reference/PARTICIPANT_EXTERNAL_OFFICIAL_PORTAL_V12_8.md`) is a
+distinct nav section (`My Hub` / `Activities` / `My Registrations` / `My Engagement` / `My
+Reimbursements`) available to every authenticated user, backed by migration `023` (`event_teams`,
+`event_registrations`, `event_team_messages`, `event_winners`, `external_event_officials`,
+`external_event_reimbursements`, `external_reimbursement_history`) plus its eligibility-aware RPC
+redefinitions in migration `027`. This rewrite (`src/features/portal/`) ports the same five-tab
+shape and reuses the legacy CSS classes verbatim (`portal-*`, `external-approval-row`), which were
+already present in `legacy.css` from the original build.
+
+- **No anonymous/no-login access exists anywhere in this module, in legacy or in this rewrite.**
+  Every Portal RPC and RLS policy already required an authenticated session in the legacy app —
+  including External Event Official reimbursement submission and its Committee approval, both
+  gated by `auth.uid()`/`is_committee_user()`, never a token. The user's instruction that "all
+  approvers must log in" was already true here; the only genuinely no-login flow in this codebase
+  was Finance's separate `expense-approval` Edge Function email-link chain, which is intentionally
+  not implemented at all — see the Finance section above.
+- **Team registration/join/decide/message RPCs (`self_register_event`, `create_event_team`,
+  `request_join_event_team`, `approve_event_team_join`) are called directly**, unlike Tournaments'
+  `create_tournament_team()` workaround — research confirmed no later migration redefines these
+  with a conflicting return type, so the RPC path is safe to use as-is.
+- **Tournament-linked events are not merged into this module's Activities list** — see the
+  Tournaments module notes above; participants register for those from the Tournaments page.
+- **Committee tooling (registration settings, official assignment, winner entry) lives in one combined
+  "Configure" modal on each Activities card**, rather than legacy's separate settings/assign/winner
+  screens — same three actions, consolidated into one place instead of three, similar in spirit to
+  the Reports module's print-helper consolidation.
+- **My Engagement uses the Portal's own legacy scoring formula** (registration +3, attendance +5,
+  achievement +5, Starter/Bronze/Silver/Gold at 0/15/40/75) — a **separate system from the
+  already-migrated Leaderboard module's scoring**, exactly as in legacy: the two were never unified
+  upstream (Leaderboard only scores Events/Tournaments; Portal engagement is a simpler,
+  registration-focused number shown to the participant themself). Not a rewrite gap — carried over
+  faithfully as two distinct, intentionally separate scores.
+- **Attendance credit for engagement matches on `staff_uid` only** (`profile.member_uid`), not the
+  fuller UID→email→name fallback chain Leaderboard uses — a smaller, Portal-scoped simplification
+  flagged the same way Leaderboard's own identity-resolution gap was flagged.
+- **`supporting_document_name` on a reimbursement submission is a free-text label, not a file
+  upload** — matching legacy exactly; the UI states bills are attached during AP submission,
+  handled entirely by the already-migrated Reimbursements module once Committee approves.
+- **Realtime subscriptions are not ported.** Legacy subscribes to a broad multi-table Postgres
+  Changes channel across the whole Portal; this rewrite polls on reload/action instead, consistent
+  with the same simplification already made in Tournaments for `tournament_team_messages`.
+- **External Official assignment looks up an existing account by email** (`profiles.email`) rather
+  than a searchable directory picker — functionally equivalent to legacy's `getCommitteeUserDirectory()`-backed
+  lookup, just a plain email field instead of a typeahead.
+- **`department_audience_map` (superseded by `staff_location_classification` in migration `028`) is
+  not referenced anywhere in this module** — confirmed dead after `028` runs, per the research; only
+  the current `staff_location_classification`-backed eligibility RPCs would be relevant here, though
+  this rewrite's Portal does not yet call `get_my_staff_audience()`/`is_staff_eligible_for_event()`
+  to gate registration eligibility client-side (server-side RLS still applies regardless) — a
+  reasonable follow-up once the Portal's audience messaging needs to match Staff Master's rules
+  more explicitly.
+
 ## Getting started
 
 ```bash
@@ -389,12 +447,11 @@ extra config — no `vercel.json` rewrite rules needed, unlike the old SPA build
 ```
 src/
   app/                Next.js App Router routes
-    (protected)/      Auth-gated routes: dashboard, events, and placeholder pages, wrapped by layout.tsx
+    (protected)/      Auth-gated routes for every migrated module, wrapped by layout.tsx
     login/             Login page
     layout.tsx, providers.tsx, globals.css, legacy.css
   lib/                Supabase client, auth context, toast context
   components/         Shared UI (layout shell, modal)
-  shared/             Small shared components (Placeholder)
   features/
     events/           Events & Activities module (fully migrated)
     committee/        Committee module (fully migrated)
@@ -407,6 +464,7 @@ src/
     documents/        Documents (manual library + read-only Reimbursements evidence view)
     reports/          Reports hub — all 15 catalog reports, CSV export, shared print helper
     settings/         Settings (profile self-service, My Committee Leave, password, sessions)
+    portal/           Participant Portal (activities, team registration, engagement, External Official reimbursements)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)
