@@ -28,8 +28,8 @@ preserves the original business logic before moving to the next.
 | Staff Master / Location Classification | ✅ Migrated (roster CRUD, CSV bulk import, unit/department → audience classification) |
 | Leaderboard | ✅ Migrated (computed ranking — no dedicated schema, see below) |
 | Documents | ✅ Migrated (upload/browse/delete library + read-only Procurement/AP evidence view) |
+| Reports | ✅ Migrated (all 15 catalog reports — filters, CSV export, print) |
 | Communication | ⏳ Not yet migrated — placeholder page |
-| Reports | ⏳ Not yet migrated — placeholder page |
 | Participant Portal / external approval pages | ⏳ Not yet migrated |
 
 The legacy `index.html` build (fully functional, all modules) is kept under `legacy-reference/`
@@ -297,6 +297,46 @@ registry in full and a scoped-down version of the aggregation:
   is written on insert and never read/enforced — every document is Committee-visible via RLS
   regardless of its value.
 
+### Known simplifications vs. the legacy build (Reports module)
+
+Like Documents, there is no dedicated schema — the legacy Reports Hub is a pure client-side
+aggregation layer over other modules' data, and this rewrite follows the same shape as read
+queries in `features/reports/queries.ts`. All 15 reports from the legacy catalog
+(`legacy-reference/REPORTS_HUB_V11.md`) are implemented, grouped into the same 7 categories, with
+the same collapsible category sidebar, generic From/To/Event/Status/Search filter bar, and an
+auto-summed KPI strip over the first 4 numeric/money columns.
+
+- **CSV export instead of Excel.** Legacy exports via SheetJS (`xlsx@0.18.5`) — the same package
+  with unpatched high-severity advisories flagged in the Staff Master notes above. Same call made
+  here: `exportReportCsv()` produces a `.csv` file instead, which opens identically in Excel/Sheets
+  for tabular data without the dependency.
+- **Consolidated the print-popup pattern.** Legacy duplicates the "open a window, write a styled
+  HTML document, `window.print()`" pattern independently across Meetings, Finance's EXCO report,
+  the Reimbursements report tab, and this hub — four separate implementations of the same idea.
+  `features/reports/print.ts`'s `printReport()` is now the one shared implementation this module
+  uses; it wasn't retrofitted into the already-migrated Meetings minutes-printing code to avoid
+  touching working code, but it's the natural function for any future module's print feature to
+  reuse instead of writing a fifth copy.
+- **Typed per-report columns instead of legacy's dynamic/regex-driven ones.** Legacy infers each
+  report's table columns from whatever keys happen to be present on the row objects, and detects
+  money/status formatting by testing column names and cell values against regexes. This rewrite
+  has each report declare its columns explicitly (`ReportColumn[]` with a real `type`), which the
+  legacy research report itself flagged as the safer approach — no behavior difference for a user,
+  just less brittle code.
+- **"Email Status Report" only covers Reimbursements' Procurement email tracking**
+  (`reimbursement_cases.email_sent_at`/`procurement_manager_email`). Legacy's version also unions
+  in Finance's final-approval email tracking, but this rewrite's Finance module doesn't implement
+  the secure email-approval-link flow yet (documented as deferred in the Finance section above) —
+  there's no email data to report on for that half until that flow exists.
+- **EXCO Activity Finance Report and the Reimbursements module's own Reports tab are not
+  ported**, matching a genuine gap in the legacy app itself: both are older, separate,
+  module-embedded report screens that were never unified into the central hub despite covering
+  overlapping ground — the legacy `REPORT_DEFINITIONS` catalog never linked to them either, so
+  this rewrite's 15-report hub has full parity with what the hub itself actually offers.
+- **No pagination** on large reports (e.g. Expense Register, Reimbursement Master, AP Register),
+  matching legacy's same all-rows-in-one-table approach — fine at current data volumes, worth
+  revisiting if any table grows large.
+
 ## Getting started
 
 ```bash
@@ -339,6 +379,7 @@ src/
     staff/            Staff Master + Location Classification (CSV import only, see notes above)
     leaderboard/      Leaderboard (computed, no dedicated schema)
     documents/        Documents (manual library + read-only Reimbursements evidence view)
+    reports/          Reports hub — all 15 catalog reports, CSV export, shared print helper
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)
