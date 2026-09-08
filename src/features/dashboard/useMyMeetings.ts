@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { MeetingAttendeeRow, MeetingRow } from '../../types/database';
-import { localTodayIso } from '../meetings/status';
+import { localTodayIso, meetingStatus } from '../meetings/status';
 
 export interface MyMeetingSummary {
   meeting: MeetingRow;
@@ -54,19 +54,23 @@ export function useMyMeetings(userId: string | undefined) {
         .eq('cancelled', false)
         .gte('meeting_date', today)
         .order('meeting_date', { ascending: true })
-        .limit(5),
+        .order('meeting_time', { ascending: true })
+        .limit(20),
       supabase.from('meeting_attendees').select('*').in('meeting_id', meetingIds),
     ]);
 
-    const built = (meetings ?? []).map((meeting) => {
-      const attendeesForMeeting = (allAttendees ?? []).filter((a) => a.meeting_id === meeting.id);
-      return {
-        meeting,
-        myAttendance: attendeesForMeeting.find((a) => a.committee_id === committeeId) ?? null,
-        totalExpected: attendeesForMeeting.length,
-        totalCheckedIn: attendeesForMeeting.filter((a) => a.attendance_status === 'Present').length,
-      };
-    });
+    const built = (meetings ?? [])
+      .filter((meeting) => meetingStatus(meeting) !== 'Completed')
+      .slice(0, 5)
+      .map((meeting) => {
+        const attendeesForMeeting = (allAttendees ?? []).filter((a) => a.meeting_id === meeting.id);
+        return {
+          meeting,
+          myAttendance: attendeesForMeeting.find((a) => a.committee_id === committeeId) ?? null,
+          totalExpected: attendeesForMeeting.length,
+          totalCheckedIn: attendeesForMeeting.filter((a) => a.attendance_status === 'Present').length,
+        };
+      });
 
     setSummaries(built);
     setLoading(false);

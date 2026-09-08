@@ -19,6 +19,7 @@ import {
   deleteAction,
   deleteAgendaItem,
   deleteDecision,
+  notifyMeetingAttendees,
   recordActionHistory,
   saveAction,
   saveAgendaItem,
@@ -57,6 +58,7 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
   const [editingAction, setEditingAction] = useState<MeetingActionRow | null>(null);
   const [quickAddAgendaId, setQuickAddAgendaId] = useState<string | undefined>(undefined);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [notifying, setNotifying] = useState(false);
   const toast = useToast();
   const { session } = useAuth();
   const myCommitteeId = useMyCommitteeMemberId(session?.user.id);
@@ -73,6 +75,18 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
       toast(err instanceof Error ? err.message : 'Failed to check in.');
     } finally {
       setCheckingIn(false);
+    }
+  };
+
+  const handleNotifyAttendees = async () => {
+    setNotifying(true);
+    try {
+      const result = await notifyMeetingAttendees(meeting.id);
+      toast(`Notified ${result.notified} attendee${result.notified === 1 ? '' : 's'}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to notify attendees.');
+    } finally {
+      setNotifying(false);
     }
   };
 
@@ -205,6 +219,9 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
             </button>
             <button className="ub-btn ub-btn-ghost" onClick={() => void handleToggleMinutes()}>
               {meeting.minutes_finalized ? 'Reopen Minutes' : 'Finalize Minutes'}
+            </button>
+            <button className="ub-btn ub-btn-ghost" onClick={() => void handleNotifyAttendees()} disabled={notifying}>
+              {notifying ? 'Notifying…' : 'Notify Attendees'}
             </button>
             {!meeting.cancelled && (
               <button className="ub-btn ub-btn-danger" onClick={() => onCancel(meeting)}>
