@@ -55,8 +55,6 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
     setError(null);
   }, [open, editing]);
 
-  const isEventOutcome = values.outcome === 'Create Event / Activity';
-
   const updateItem = (id: string, patch: Partial<RequiredItem>) => {
     setValues((v) => ({ ...v, requiredItems: v.requiredItems.map((it) => (it.id === id ? { ...it, ...patch } : it)) }));
   };
@@ -150,12 +148,15 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
         </div>
       </div>
 
-      {isEventOutcome && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ub-ink-soft)', marginBottom: 4 }}>Items required for this event</div>
-          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ub-ink-faint)' }}>
-            Listed here so they carry onto the event, and pre-fill its Expense Request line items automatically.
-          </p>
+      <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--ub-border)' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ub-ink-soft)', marginBottom: 4 }}>
+          Items required for the event{values.requiredItems.length > 0 ? ` (${values.requiredItems.length})` : ''}
+        </div>
+        <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ub-ink-faint)' }}>
+          Optional — only matters if this item becomes an event. Listed here so they carry onto the event, and pre-fill its
+          Expense Request line items automatically. You don't need to set Outcome first.
+        </p>
+        {values.requiredItems.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {values.requiredItems.map((item) => (
               <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto auto', gap: 8, alignItems: 'center' }}>
@@ -186,15 +187,15 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
               </div>
             ))}
           </div>
-          <button
-            className="ub-btn ub-btn-ghost"
-            style={{ marginTop: 10, padding: '8px 14px', fontSize: 12.5 }}
-            onClick={() => setValues((v) => ({ ...v, requiredItems: [...v.requiredItems, emptyItem()] }))}
-          >
-            + Add item
-          </button>
-        </div>
-      )}
+        )}
+        <button
+          className="ub-btn ub-btn-ghost"
+          style={{ marginTop: 10, padding: '8px 14px', fontSize: 12.5 }}
+          onClick={() => setValues((v) => ({ ...v, requiredItems: [...v.requiredItems, emptyItem()] }))}
+        >
+          + Add item
+        </button>
+      </div>
 
       {error && <div style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>{error}</div>}
       <div className="modal-actions">
