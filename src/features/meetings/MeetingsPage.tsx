@@ -14,6 +14,7 @@ import {
   applyCarryForward,
   cancelMeeting,
   createMeeting,
+  notifyMeetingAttendees,
   pendingEventCreationAgenda,
   recordActionHistory,
   saveAction,
@@ -88,7 +89,12 @@ export function MeetingsPage() {
         const actions = meetings.flatMap((m) => m.actions).filter((a) => carryForwardIds.includes(a.id));
         await applyCarryForward(id, actions, meetings);
       }
-      toast('Meeting scheduled');
+      try {
+        await notifyMeetingAttendees(id);
+      } catch {
+        // Non-fatal — the meeting itself is scheduled either way.
+      }
+      toast('Meeting scheduled — attendees notified');
       await reload();
       setWorkspaceId(id);
     }

@@ -673,6 +673,17 @@ export interface ExternalReimbursementHistoryRow {
   created_at: string;
 }
 
+export interface NotificationRow {
+  id: string;
+  user_id: string | null;
+  title: string;
+  message: string | null;
+  related_type: string | null;
+  related_id: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
 export interface DocumentRegistryRow {
   id: string;
   title: string;
@@ -824,6 +835,7 @@ export interface Database {
         Insert: Partial<ExternalReimbursementHistoryRow>;
         Update: Partial<ExternalReimbursementHistoryRow>;
       };
+      notifications: { Row: NotificationRow; Insert: Partial<NotificationRow>; Update: Partial<NotificationRow> };
     };
   };
 }

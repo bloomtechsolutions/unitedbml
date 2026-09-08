@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 
 interface SubItem {
   to: string;
@@ -184,7 +185,12 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <div className="ub-main">{children}</div>
+      <div className="ub-main">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}>
+          <NotificationBell />
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

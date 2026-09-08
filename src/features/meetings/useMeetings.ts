@@ -128,6 +128,40 @@ export async function updateAttendeeStatus(attendeeId: string, status: string) {
   if (error) throw error;
 }
 
+/** Marks the CALLER's own attendee row Present — cannot touch anyone else's row. */
+export async function checkInToMeeting(meetingId: string) {
+  const { data, error } = await supabase.rpc('check_in_to_meeting', { p_meeting_id: meetingId });
+  if (error) throw error;
+  return data as { ok: boolean; attendeeId: string };
+}
+
+/** Notifies every expected attendee with a linked account that this meeting is scheduled. */
+export async function notifyMeetingAttendees(meetingId: string) {
+  const { data, error } = await supabase.rpc('notify_meeting_attendees', { p_meeting_id: meetingId });
+  if (error) throw error;
+  return data as { ok: boolean; notified: number };
+}
+
+/** Resolves the current user's own committee_members.id, if they hold a Committee position. */
+export function useMyCommitteeMemberId(userId: string | undefined) {
+  const [committeeId, setCommitteeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setCommitteeId(null);
+      return;
+    }
+    supabase
+      .from('committee_members')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle()
+      .then(({ data }) => setCommitteeId(data?.id ?? null));
+  }, [userId]);
+
+  return committeeId;
+}
+
 export async function saveAgendaItem(payload: Partial<MeetingAgendaRow> & { meeting_id: string }) {
   const id = payload.id ?? crypto.randomUUID();
   const sourceKey = payload.source_key ?? id;

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
+import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import type { CommitteeMemberOption } from '../events/types';
 import type { MeetingActionRow, MeetingAgendaRow, MeetingDecisionRow } from '../../types/database';
@@ -13,6 +14,7 @@ import { isDueToday, isOverdue, meetingStatus } from './status';
 import { ATTENDANCE_STATUSES } from './types';
 import type { MeetingStatus, MeetingWithChildren } from './types';
 import {
+  checkInToMeeting,
   createEventFromAgendaItem,
   deleteAction,
   deleteAgendaItem,
@@ -23,6 +25,7 @@ import {
   saveDecision,
   toggleMinutesFinalized,
   updateAttendeeStatus,
+  useMyCommitteeMemberId,
 } from './useMeetings';
 
 type Tab = 'overview' | 'agenda' | 'attendance' | 'decisions' | 'actions' | 'minutes';
@@ -53,9 +56,25 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [editingAction, setEditingAction] = useState<MeetingActionRow | null>(null);
   const [quickAddAgendaId, setQuickAddAgendaId] = useState<string | undefined>(undefined);
+  const [checkingIn, setCheckingIn] = useState(false);
   const toast = useToast();
+  const { session } = useAuth();
+  const myCommitteeId = useMyCommitteeMemberId(session?.user.id);
 
   if (!meeting) return null;
+
+  const handleCheckIn = async () => {
+    setCheckingIn(true);
+    try {
+      await checkInToMeeting(meeting.id);
+      await onRefresh();
+      toast("You're checked in");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to check in.');
+    } finally {
+      setCheckingIn(false);
+    }
+  };
 
   const status = meetingStatus(meeting);
   const openActions = meeting.actions.filter((a) => a.status !== 'Completed');
@@ -326,29 +345,58 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
       )}
 
       {tab === 'attendance' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {meeting.attendees.map((attendee) => (
-            <div key={attendee.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 4px', borderBottom: '1px solid var(--ub-border)' }}>
-              <div>
-                <b style={{ fontSize: 13.5 }}>{attendee.attendee_name}</b>
-                <small style={{ display: 'block', color: 'var(--ub-ink-faint)', marginTop: 2 }}>{attendee.attendee_role}</small>
+        <div>
+          {myCommitteeId && (() => {
+            const mine = meeting.attendees.find((a) => a.committee_id === myCommitteeId);
+            if (!mine) return null;
+            const alreadyIn = mine.attendance_status === 'Present';
+            return (
+              <div className={`ub-banner ${alreadyIn ? 'ub-banner-success' : 'ub-banner-accent'}`}>
+                {alreadyIn ? (
+                  <>✓ You're checked in to this meeting.</>
+                ) : (
+                  <>
+                    You're expected at this meeting.
+                    <button
+                      className="ub-btn ub-btn-primary"
+                      style={{ marginLeft: 'auto', padding: '7px 16px', fontSize: 12.5 }}
+                      onClick={() => void handleCheckIn()}
+                      disabled={checkingIn}
+                    >
+                      {checkingIn ? 'Checking in…' : 'Check In'}
+                    </button>
+                  </>
+                )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="ub-pill ub-pill-neutral">{attendee.attendance_status}</span>
-                <select
-                  value={attendee.attendance_status ?? 'Expected'}
-                  onChange={(e) => void handleAttendance(attendee.id, e.target.value)}
-                >
-                  {ATTENDANCE_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+            );
+          })()}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {meeting.attendees.map((attendee) => (
+              <div key={attendee.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 4px', borderBottom: '1px solid var(--ub-border)' }}>
+                <div>
+                  <b style={{ fontSize: 13.5 }}>
+                    {attendee.attendee_name}
+                    {attendee.committee_id === myCommitteeId && <span style={{ color: 'var(--ub-accent-dark)', fontWeight: 600 }}> (you)</span>}
+                  </b>
+                  <small style={{ display: 'block', color: 'var(--ub-ink-faint)', marginTop: 2 }}>{attendee.attendee_role}</small>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="ub-pill ub-pill-neutral">{attendee.attendance_status}</span>
+                  <select
+                    value={attendee.attendance_status ?? 'Expected'}
+                    onChange={(e) => void handleAttendance(attendee.id, e.target.value)}
+                  >
+                    {ATTENDANCE_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
-          ))}
-          {!meeting.attendees.length && <p className="ub-empty">No attendees seated yet.</p>}
+            ))}
+            {!meeting.attendees.length && <p className="ub-empty">No attendees seated yet.</p>}
+          </div>
         </div>
       )}
 
