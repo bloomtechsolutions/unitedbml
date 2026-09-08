@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function leaderboardPage() {
-  return <Placeholder title="Leaderboard" />;
+import { LeaderboardPage } from '../../../features/leaderboard/LeaderboardPage';
+
+export default function LeaderboardRoute() {
+  return <LeaderboardPage />;
 }

@@ -26,7 +26,7 @@ preserves the original business logic before moving to the next.
 | Reimbursements | ✅ Migrated (Procurement pre-approval, exceptions, AP batches/bills, vendor master, status tracking) |
 | Tournaments | ✅ Migrated (registration/teams, matches, live screen, results & department stats) — see below for a real DB bug found and worked around |
 | Staff Master / Location Classification | ✅ Migrated (roster CRUD, CSV bulk import, unit/department → audience classification) |
-| Leaderboard | ⏳ Not yet migrated — placeholder page |
+| Leaderboard | ✅ Migrated (computed ranking — no dedicated schema, see below) |
 | Communication | ⏳ Not yet migrated — placeholder page |
 | Documents | ⏳ Not yet migrated — placeholder page |
 | Reports | ⏳ Not yet migrated — placeholder page |
@@ -240,6 +240,35 @@ up in `src/components/Layout.tsx` since the initial scaffold) — same as legacy
   display-only preview computed against the same snapshot the table renders from — consistent
   with, not a regression from, the legacy build's own (already duplicated) approach.
 
+### Known simplifications vs. the legacy build (Leaderboard module)
+
+There is no dedicated leaderboard/points table in either build — this is purely a computed
+ranking over data already owned by Events and Tournaments, recalculated on every load. Same
+scoring weights as legacy (`features/leaderboard/compute.ts`): +3 for event attendance (once per
+person per event), +2 per completed event task, +3 for an approved tournament registration, +10
+for a 1st-place/"winner" tournament result, +5 for any other placement. Same level thresholds
+(Starter/Bronze/Silver/Gold at 0/15/40/75 points) and the same Overall/Events/Tournaments/Delivery
+view tabs with a podium + expandable ranking list.
+
+- **Meetings and Committee activity are intentionally excluded from scoring**, exactly as in the
+  legacy build — despite the page's own subtitle implying broader "engagement," the legacy
+  `unitedBMLLeaderboardRows()` only ever reads event/tournament data. Not a rewrite gap; carried
+  over faithfully. Worth a product decision later if broader scoring is wanted.
+- **Event attendance credit requires `attended = true`**, not just being on the roster. The legacy
+  code's exact filter on its in-memory `attendance[]` array is ambiguous (the research couldn't
+  confirm whether it required a "Present" mark or credited anyone listed), so this rewrite makes
+  the more defensible call: an explicit "attended" mark, not just being invited/expected. Flagged
+  here as an interpretation, not a fully verified port.
+- **No date/period scoping** — a lifetime cumulative total, same as legacy (not per committee term,
+  not per year). Recomputed from every event/tournament row currently in the database each time
+  the page loads, same no-caching approach as legacy (acceptable at current data volumes; worth
+  revisiting — e.g. a materialized view or RPC — if the tables grow large).
+- **Row identity resolution** (matching event attendance / tournament registration / task-owner
+  records to one person) prefers staff UID, then email, then a lowercased name — the same fragile
+  fallback chain legacy uses, explicitly flagged in research as worth hardening later (e.g. always
+  resolving through Staff Master's UID rather than trusting free-text names on event tasks, which
+  have no UID field at all in either schema).
+
 ## Getting started
 
 ```bash
@@ -280,6 +309,7 @@ src/
     reimbursements/   Reimbursements/AP module (no email dispatch; see notes above)
     tournaments/      Tournaments module (auto-provisioned only, no create UI)
     staff/            Staff Master + Location Classification (CSV import only, see notes above)
+    leaderboard/      Leaderboard (computed, no dedicated schema)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)
