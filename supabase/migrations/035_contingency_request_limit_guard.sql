@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.10.8
 -- Hard database guard: contingency requests cannot exceed the approved reserve.
 -- Pending requests reserve their requested amount until rejected/cancelled.

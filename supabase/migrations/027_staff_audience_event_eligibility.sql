@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.9
 -- Central Staff Audience & Event Eligibility
 

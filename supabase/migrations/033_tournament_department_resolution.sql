@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.10.6
 -- Resolve Tournament Department Engagement from the current Staff Master.
 

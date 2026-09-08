@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.10.9
 -- Add traceability for President contingency notifications.
 

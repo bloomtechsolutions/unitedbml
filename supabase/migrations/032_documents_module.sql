@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.10
 -- Documents module: manual document registry + private document storage.
 -- Financial source documents remain linked to their existing storage paths.

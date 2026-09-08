@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.9.9
 -- Centrally store Procurement response emails/evidence in Supabase Storage.
 

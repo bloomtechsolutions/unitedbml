@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.9.4
 -- Keep Committee role separate from BML organizational placement.
 

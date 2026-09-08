@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.9.5
 -- Committee members can manage only their own leave from Settings.
 

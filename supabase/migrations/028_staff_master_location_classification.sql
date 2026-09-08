@@ -1,4 +1,3 @@
-\
 -- UnitedBML V12.9.2 Staff Master & Unit-first Location Classification
 alter table public.staff add column if not exists job_title text;
 alter table public.staff add column if not exists division text;
