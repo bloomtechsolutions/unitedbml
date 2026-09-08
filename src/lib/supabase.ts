@@ -12,7 +12,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Falls back to a syntactically valid placeholder so the client can be constructed during
 // prerendering/build when env vars aren't set yet; real calls will fail loudly at runtime instead.
-export const supabase = createClient(supabaseUrl ?? 'https://placeholder.supabase.co', supabaseAnonKey ?? 'placeholder-anon-key', {
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-anon-key', {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
