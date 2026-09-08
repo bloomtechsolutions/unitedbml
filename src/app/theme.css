@@ -1,0 +1,290 @@
+/* UnitedBML — warm redesign design system.
+   Prefixed `.ub-*` so it can be introduced page-by-page without clashing
+   with the legacy.css classes still used by not-yet-rebuilt modules. */
+
+:root {
+  --ub-bg: oklch(97.5% 0.012 60);
+  --ub-surface: oklch(99% 0.005 60);
+  --ub-surface-2: oklch(96% 0.02 55);
+  --ub-ink: oklch(24% 0.02 40);
+  --ub-ink-soft: oklch(48% 0.02 45);
+  --ub-ink-faint: oklch(64% 0.015 50);
+  --ub-border: oklch(90% 0.015 55);
+
+  --ub-accent: oklch(66% 0.19 39);
+  --ub-accent-dark: oklch(52% 0.17 35);
+  --ub-accent-soft: oklch(94% 0.045 40);
+
+  --ub-gold: oklch(79% 0.14 78);
+  --ub-gold-dark: oklch(58% 0.12 72);
+  --ub-gold-soft: oklch(95% 0.05 80);
+
+  --ub-success: oklch(64% 0.13 152);
+  --ub-success-dark: oklch(45% 0.12 152);
+  --ub-success-soft: oklch(95% 0.045 152);
+
+  --ub-warning: oklch(76% 0.15 78);
+  --ub-warning-dark: oklch(50% 0.12 78);
+  --ub-warning-soft: oklch(95% 0.05 80);
+
+  --ub-danger: oklch(60% 0.19 25);
+  --ub-danger-dark: oklch(48% 0.16 25);
+  --ub-danger-soft: oklch(95% 0.05 25);
+
+  --ub-info: oklch(58% 0.14 300);
+  --ub-info-dark: oklch(46% 0.13 300);
+  --ub-info-soft: oklch(94% 0.03 300);
+
+  --ub-sidebar: oklch(26% 0.035 42);
+  --ub-sidebar-2: oklch(31% 0.04 42);
+  --ub-cream: oklch(96% 0.02 70);
+
+  --ub-radius-sm: 10px;
+  --ub-radius: 14px;
+  --ub-radius-lg: 20px;
+}
+
+.ub-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--ub-bg);
+  color: var(--ub-ink);
+  font-family: var(--font-body), 'Figtree', system-ui, sans-serif;
+}
+.ub-shell h1, .ub-shell h2, .ub-shell h3, .ub-shell h4 {
+  font-family: var(--font-display), 'Baloo 2', var(--font-body), sans-serif;
+  margin: 0;
+}
+.ub-shell a { color: var(--ub-accent-dark); text-decoration: none; }
+.ub-shell a:hover { color: var(--ub-accent); }
+
+/* Sidebar */
+.ub-sidebar {
+  flex: 0 0 260px;
+  background: linear-gradient(190deg, var(--ub-sidebar), var(--ub-sidebar-2));
+  display: flex;
+  flex-direction: column;
+  padding: 26px 18px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.ub-brand { display: flex; align-items: center; gap: 11px; padding: 6px 10px 26px; }
+.ub-brand img { width: 32px; height: 32px; filter: brightness(0) invert(1); }
+.ub-brand span { font-family: var(--font-display), 'Baloo 2', sans-serif; font-weight: 700; font-size: 18px; color: var(--ub-cream); }
+
+.ub-navgroup-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: oklch(85% 0.02 60 / 0.45);
+  padding: 16px 16px 6px;
+}
+.ub-navgroup-label:first-child { padding-top: 4px; }
+
+.ub-navitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: var(--ub-radius);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: oklch(88% 0.02 60 / 0.75);
+  cursor: pointer;
+}
+.ub-navitem:hover { background: oklch(100% 0 0 / 0.06); color: #fff; }
+.ub-navitem.active { background: var(--ub-accent); color: #fff; }
+.ub-navitem svg { flex: none; }
+
+.ub-sidebar-spacer { flex: 1; }
+
+.ub-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border-radius: 16px;
+  background: oklch(100% 0 0 / 0.06);
+}
+.ub-sidebar-user button {
+  border: 0;
+  background: transparent;
+  color: oklch(85% 0.02 60 / 0.6);
+  cursor: pointer;
+  padding: 4px;
+  flex: none;
+}
+.ub-sidebar-user button:hover { color: #fff; }
+
+/* Avatar */
+.ub-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  flex: none;
+  background: oklch(70% 0.16 40);
+}
+
+/* Main content */
+.ub-main { flex: 1; padding: 34px 40px; min-width: 0; }
+
+.ub-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+.ub-search {
+  border: 1px solid var(--ub-border);
+  background: var(--ub-surface);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ub-ink-faint);
+  font-size: 13.5px;
+  width: 280px;
+}
+.ub-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ub-surface);
+  border: 1px solid var(--ub-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Cards / KPI */
+.ub-card {
+  background: var(--ub-surface);
+  border: 1px solid var(--ub-border);
+  border-radius: var(--ub-radius-lg);
+  padding: 22px;
+}
+.ub-kpi { padding: 20px; }
+.ub-kpi-icon {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+}
+.ub-kpi-value { font-size: 28px; font-weight: 700; }
+.ub-kpi-label { font-size: 13px; color: var(--ub-ink-soft); margin-top: 2px; }
+
+/* Buttons */
+.ub-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: var(--ub-radius-sm);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+}
+.ub-btn-primary { background: var(--ub-accent); color: #fff; box-shadow: 0 8px 20px oklch(66% 0.19 39 / 0.28); }
+.ub-btn-primary:hover { background: var(--ub-accent-dark); }
+.ub-btn-ghost { background: transparent; border-color: var(--ub-border); color: var(--ub-ink-soft); }
+.ub-btn-ghost:hover { border-color: var(--ub-ink-faint); }
+.ub-btn-danger { background: transparent; border-color: var(--ub-danger); color: var(--ub-danger-dark); }
+.ub-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* Pills / status badges */
+.ub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.ub-pill-accent { background: var(--ub-accent-soft); color: var(--ub-accent-dark); }
+.ub-pill-gold { background: var(--ub-gold-soft); color: var(--ub-gold-dark); }
+.ub-pill-success { background: var(--ub-success-soft); color: var(--ub-success-dark); }
+.ub-pill-warning { background: var(--ub-warning-soft); color: var(--ub-warning-dark); }
+.ub-pill-danger { background: var(--ub-danger-soft); color: var(--ub-danger-dark); }
+.ub-pill-info { background: var(--ub-info-soft); color: var(--ub-info-dark); }
+.ub-pill-neutral { background: var(--ub-surface-2); color: var(--ub-ink-soft); }
+
+/* Banners */
+.ub-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.ub-banner-accent { background: var(--ub-accent-soft); color: var(--ub-accent-dark); }
+.ub-banner-warning { background: var(--ub-warning-soft); color: var(--ub-warning-dark); }
+.ub-banner-success { background: var(--ub-success-soft); color: var(--ub-success-dark); }
+
+/* Tabs */
+.ub-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.ub-tab {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--ub-border);
+  color: var(--ub-ink-soft);
+  background: var(--ub-surface);
+  cursor: pointer;
+}
+.ub-tab.active { background: var(--ub-ink); color: #fff; border-color: var(--ub-ink); }
+
+/* Table-ish list rows */
+.ub-table-head {
+  display: grid;
+  padding: 0 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ub-ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--ub-border);
+}
+.ub-table-row {
+  display: grid;
+  align-items: center;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--ub-border);
+}
+.ub-table-row:last-child { border-bottom: 0; }
+
+/* Form fields */
+.ub-field label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ub-ink-soft);
+  margin-bottom: 6px;
+}
+.ub-field input, .ub-field select, .ub-field textarea {
+  width: 100%;
+  border: 1.5px solid var(--ub-border);
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--ub-ink);
+  background: var(--ub-surface);
+}
+.ub-field textarea { min-height: 80px; resize: vertical; }
+
+.ub-empty { text-align: center; color: var(--ub-ink-faint); padding: 32px; font-size: 13.5px; }
