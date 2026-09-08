@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function staffaudiencePage() {
-  return <Placeholder title="Location Classification" />;
+import { StaffAudiencePage } from '../../../features/staff/StaffAudiencePage';
+
+export default function StaffAudienceRoute() {
+  return <StaffAudiencePage />;
 }

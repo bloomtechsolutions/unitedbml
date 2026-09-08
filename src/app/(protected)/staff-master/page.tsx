@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function staffmasterPage() {
-  return <Placeholder title="Staff Master" />;
+import { StaffMasterPage } from '../../../features/staff/StaffMasterPage';
+
+export default function StaffMasterRoute() {
+  return <StaffMasterPage />;
 }

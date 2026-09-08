@@ -25,11 +25,11 @@ preserves the original business logic before moving to the next.
 | Finance | ✅ Migrated (requests, President/Final approval chain, reversals, budget tracking) — Contingency deferred, see below |
 | Reimbursements | ✅ Migrated (Procurement pre-approval, exceptions, AP batches/bills, vendor master, status tracking) |
 | Tournaments | ✅ Migrated (registration/teams, matches, live screen, results & department stats) — see below for a real DB bug found and worked around |
+| Staff Master / Location Classification | ✅ Migrated (roster CRUD, CSV bulk import, unit/department → audience classification) |
 | Leaderboard | ⏳ Not yet migrated — placeholder page |
 | Communication | ⏳ Not yet migrated — placeholder page |
 | Documents | ⏳ Not yet migrated — placeholder page |
 | Reports | ⏳ Not yet migrated — placeholder page |
-| Staff Master / Location Classification | ⏳ Not yet migrated — placeholder page |
 | Participant Portal / external approval pages | ⏳ Not yet migrated |
 
 The legacy `index.html` build (fully functional, all modules) is kept under `legacy-reference/`
@@ -204,6 +204,42 @@ to add here.
   subscribing to realtime updates — a reasonable follow-up once a broader realtime pattern is
   wanted across the app.
 
+### Known simplifications vs. the legacy build (Staff Master / Location Classification)
+
+Both pages are Administrator-only in the UI (matching the two `adminOnly` nav items already wired
+up in `src/components/Layout.tsx` since the initial scaffold) — same as legacy.
+
+- **Bulk import is CSV-only; no `.xlsx` support.** The legacy build's Excel import loads the
+  `xlsx` (SheetJS) package from a CDN `&lt;script&gt;` tag. The current npm-published `xlsx@0.18.5` —
+  the same version the legacy build pins — has two unpatched high-severity advisories (prototype
+  pollution, ReDoS) with "no fix available" on the npm registry; SheetJS only publishes fixes
+  through their own CDN now, not npm. Rather than ship a known-vulnerable dependency (even for an
+  admin-only upload), this rewrite supports CSV import only, using the same lenient
+  header-alias matching (`UID`/`Staff ID`, `Name`/`Full Name`, etc. — see
+  `features/staff/csv.ts`) as the legacy Excel/CSV parser. Real-world Excel exports convert to CSV
+  trivially; `.xlsx` support can be revisited later against a vetted library (e.g. SheetJS's own
+  CDN-hosted patched build, or `exceljs`) if it's actually needed.
+- **Added a Status field to the edit form.** The legacy edit modal has no way to deactivate a
+  staff member despite `status` being a real column and RPC parameter — a gap the research
+  surfaced. This rewrite's `StaffEditModal` exposes Active/Inactive directly.
+- **Added a one-click "Missing org data only" filter** on the roster (the legacy build only shows
+  a count tile; finding the actual incomplete records means manually working the filters). Small,
+  low-risk usability addition matching the spirit of the existing "Missing Org Data" KPI tile.
+- **A pre-existing client/DB permission gap is carried over, not fixed.** Both tables' RLS grants
+  write access to any Committee-role user (`is_committee_user()`), but the legacy nav — and this
+  rewrite's `adminOnly` gate — only *shows* these pages to Administrators. A non-Administrator
+  Committee member could still write to `staff`/`staff_location_classification` directly via the
+  Supabase client if they knew to. This is unchanged from legacy behavior and is a backend RLS
+  decision, not a rewrite regression — flagging it here in case tightening the RLS to
+  Administrator-only is ever wanted.
+- **The "Unit overrides Department" precedence is computed client-side** for the Location
+  Classification page's display (same as legacy's `resolvedAudience()`) rather than calling the
+  `staff_audience_for_user()` RPC per staff member, which would mean one RPC call per row. Actual
+  eligibility enforcement for event/tournament registration already goes through that RPC via
+  `is_staff_eligible_for_event()`/`is_staff_eligible_for_tournament()`, so this page's tiles are a
+  display-only preview computed against the same snapshot the table renders from — consistent
+  with, not a regression from, the legacy build's own (already duplicated) approach.
+
 ## Getting started
 
 ```bash
@@ -243,6 +279,7 @@ src/
     finance/          Finance module (core expense/approval lifecycle; Contingency deferred)
     reimbursements/   Reimbursements/AP module (no email dispatch; see notes above)
     tournaments/      Tournaments module (auto-provisioned only, no create UI)
+    staff/            Staff Master + Location Classification (CSV import only, see notes above)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)

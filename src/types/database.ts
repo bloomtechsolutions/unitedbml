@@ -564,6 +564,17 @@ export interface TournamentWinnerRow {
   created_at: string;
 }
 
+export interface StaffLocationClassificationRow {
+  id: string;
+  match_type: string;
+  match_value: string;
+  audience_category: string;
+  notes: string | null;
+  active: boolean;
+  updated_by: string | null;
+  updated_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -657,6 +668,11 @@ export interface Database {
         Row: TournamentWinnerRow;
         Insert: Partial<TournamentWinnerRow>;
         Update: Partial<TournamentWinnerRow>;
+      };
+      staff_location_classification: {
+        Row: StaffLocationClassificationRow;
+        Insert: Partial<StaffLocationClassificationRow>;
+        Update: Partial<StaffLocationClassificationRow>;
       };
     };
   };
