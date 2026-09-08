@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function committeePage() {
-  return <Placeholder title="Committee" />;
+import { CommitteePage } from '../../../features/committee/CommitteePage';
+
+export default function CommitteeRoute() {
+  return <CommitteePage />;
 }

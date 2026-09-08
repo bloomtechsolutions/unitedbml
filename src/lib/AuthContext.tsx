@@ -10,6 +10,7 @@ interface AuthState {
   profile: Profile | null;
   loading: boolean;
   isAdministrator: boolean;
+  isCommitteeUser: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCommitteeUser, setIsCommitteeUser] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -44,7 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session) {
+      setIsCommitteeUser(false);
+      return;
+    }
     let active = true;
     setLoading(true);
     supabase
@@ -61,6 +66,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(data ?? null);
         setLoading(false);
       });
+    supabase.rpc('is_committee_user').then(({ data, error }) => {
+      if (!active) return;
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to resolve committee access', error);
+        return;
+      }
+      setIsCommitteeUser(Boolean(data));
+    });
     return () => {
       active = false;
     };
@@ -77,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAdministrator: profile?.role === 'Administrator',
+        isCommitteeUser,
         signOut,
       }}
     >

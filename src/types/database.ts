@@ -13,8 +13,52 @@ export interface Profile {
   role: UserRole;
   committee_slot: string | null;
   status: string;
+  member_uid: string | null;
+  contact_no: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CommitteeMemberRow {
+  id: string;
+  role: string;
+  group_name: string | null;
+  icon: string | null;
+  name: string | null;
+  uid: string | null;
+  contact: string | null;
+  email: string | null;
+  term_start: string | null;
+  term_end: string | null;
+  status: string;
+  availability: string;
+  leave_from: string | null;
+  leave_to: string | null;
+  notes: string | null;
+  user_id: string | null;
+  staff_uid: string | null;
+  data: Record<string, unknown>;
+  updated_at: string;
+}
+
+export interface AppSettingRow {
+  setting_key: string;
+  setting_value: Record<string, unknown>;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface StaffRow {
+  id: string;
+  uid: string;
+  full_name: string;
+  contact_no: string | null;
+  email: string | null;
+  status: string;
+  job_title: string | null;
+  division: string | null;
+  department: string | null;
+  unit: string | null;
 }
 
 export interface EventRow {
@@ -114,6 +158,13 @@ export interface Database {
         Update: Partial<EventAttendanceRow>;
       };
       event_types: { Row: EventTypeRow; Insert: Partial<EventTypeRow>; Update: Partial<EventTypeRow> };
+      committee_members: {
+        Row: CommitteeMemberRow;
+        Insert: Partial<CommitteeMemberRow>;
+        Update: Partial<CommitteeMemberRow>;
+      };
+      app_settings: { Row: AppSettingRow; Insert: Partial<AppSettingRow>; Update: Partial<AppSettingRow> };
+      staff: { Row: StaffRow; Insert: Partial<StaffRow>; Update: Partial<StaffRow> };
     };
   };
 }

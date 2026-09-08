@@ -20,11 +20,11 @@ preserves the original business logic before moving to the next.
 |---|---|
 | Auth, layout shell, navigation | ✅ Migrated |
 | Events & Activities | ✅ Migrated (core CRUD, tasks, attendance, lifecycle automation) |
+| Committee | ✅ Migrated (roster, assign/vacate, positions & structure admin, club-wide term) |
 | Tournaments | ⏳ Not yet migrated — placeholder page |
 | Finance | ⏳ Not yet migrated — placeholder page |
 | Reimbursements | ⏳ Not yet migrated — placeholder page |
 | Meetings | ⏳ Not yet migrated — placeholder page |
-| Committee | ⏳ Not yet migrated — placeholder page |
 | Leaderboard | ⏳ Not yet migrated — placeholder page |
 | Communication | ⏳ Not yet migrated — placeholder page |
 | Documents | ⏳ Not yet migrated — placeholder page |
@@ -48,6 +48,22 @@ by this app and can be deleted once migration is complete.
 - Writes go straight to Supabase from the browser (no more localStorage-as-source-of-truth +
   debounced sync queue) — this is an intentional architectural simplification enabled by the
   rewrite, not a temporary gap.
+
+### Known simplifications vs. the legacy build (Committee module)
+
+- The org-chart tree diagram is replaced by a flat, filterable roster list plus an admin table for
+  setting each position's "Reports To" (`parentId`) and display order — the same data is captured
+  (`parentId`/`displayOrder`, stored in `committee_members.data` jsonb same as the legacy build,
+  since those were never normalized into columns), just not rendered as a visual tree yet.
+- Self-service "My Committee Leave" (the `update_my_committee_leave`/`clear_my_committee_leave`
+  RPCs) lives on the legacy Settings page, not the Committee page itself, and Settings hasn't been
+  migrated yet — deferred until then.
+- `committee_leave_history` has no writer in the legacy app either (dead/unfinished audit-log
+  table) — not wired up here, same as upstream.
+- The `COMMITTEE_APP_ROLES` client-side role allow-list from the legacy build is replaced by
+  calling the `is_committee_user()` RPC directly (exposed as `isCommitteeUser` on `useAuth()`) —
+  this removes the risk of the client list drifting from the SQL source of truth, which had
+  already happened once in the legacy code (see migration history around `023_*`).
 
 ## Getting started
 
@@ -83,6 +99,7 @@ src/
   shared/             Small shared components (Placeholder)
   features/
     events/           Events & Activities module (fully migrated)
+    committee/        Committee module (fully migrated)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)
