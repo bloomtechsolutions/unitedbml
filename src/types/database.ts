@@ -575,6 +575,26 @@ export interface StaffLocationClassificationRow {
   updated_at: string;
 }
 
+export interface DocumentRegistryRow {
+  id: string;
+  title: string;
+  category: string;
+  event_id: string | null;
+  event_name: string | null;
+  source_module: string;
+  source_record_id: string | null;
+  file_name: string;
+  file_type: string | null;
+  file_size: number;
+  storage_bucket: string;
+  storage_path: string;
+  visibility: string;
+  notes: string | null;
+  uploaded_by: string | null;
+  uploaded_by_name: string | null;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -673,6 +693,11 @@ export interface Database {
         Row: StaffLocationClassificationRow;
         Insert: Partial<StaffLocationClassificationRow>;
         Update: Partial<StaffLocationClassificationRow>;
+      };
+      document_registry: {
+        Row: DocumentRegistryRow;
+        Insert: Partial<DocumentRegistryRow>;
+        Update: Partial<DocumentRegistryRow>;
       };
     };
   };

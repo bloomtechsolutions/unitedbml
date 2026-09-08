@@ -27,8 +27,8 @@ preserves the original business logic before moving to the next.
 | Tournaments | ✅ Migrated (registration/teams, matches, live screen, results & department stats) — see below for a real DB bug found and worked around |
 | Staff Master / Location Classification | ✅ Migrated (roster CRUD, CSV bulk import, unit/department → audience classification) |
 | Leaderboard | ✅ Migrated (computed ranking — no dedicated schema, see below) |
+| Documents | ✅ Migrated (upload/browse/delete library + read-only Procurement/AP evidence view) |
 | Communication | ⏳ Not yet migrated — placeholder page |
-| Documents | ⏳ Not yet migrated — placeholder page |
 | Reports | ⏳ Not yet migrated — placeholder page |
 | Participant Portal / external approval pages | ⏳ Not yet migrated |
 
@@ -269,6 +269,34 @@ view tabs with a podium + expandable ranking list.
   resolving through Staff Master's UID rather than trusting free-text names on event tasks, which
   have no UID field at all in either schema).
 
+### Known simplifications vs. the legacy build (Documents module)
+
+Legacy's Documents section is really two things: a small manual upload registry
+(`document_registry` table + a dedicated `unitedbml-documents` Storage bucket, from migration
+`032_documents_module.sql`), and a much larger "virtual aggregation" layer that pulls in read-only
+records from Finance/Reimbursements/AP without copying their files. This rewrite ports the manual
+registry in full and a scoped-down version of the aggregation:
+
+- **Manual document library**: upload (title, category, optional Event link, notes, 25 MB cap
+  enforced both client- and Storage-bucket-side), search/filter, per-event folder view, open via a
+  15-minute signed URL, delete (Committee-only both ways, matching the `is_committee_user()` RLS on
+  both the table and the bucket). Same rollback-safety as legacy: a failed DB insert after a
+  successful upload removes the orphaned Storage object.
+- **Linked evidence tab**: surfaces Procurement pre-approval response evidence and AP bill
+  attachments already stored by the Reimbursements module (reading `reimbursement_cases.data`,
+  `ap_batches.bills_attachment_path`, `ap_bills.data`) via the same `reimbursement-evidence` bucket
+  — read-only, not copied, exactly matching legacy's approach of never duplicating another
+  module's storage objects.
+- **Not ported**: "Approved Notes" (legacy generates an Expense-Approval-Note PDF on demand from
+  Finance data using jsPDF — this rewrite has no PDF-generation library wired up yet; opening an
+  approved request's detail already works from the Finance page itself), the Meetings/Governance
+  and Tournament-Results virtual categories (Meetings/Tournaments have no stored *files* to surface
+  here — those modules' own pages are the source of truth for that data), and the legacy IndexedDB
+  fallback path for pre-Storage-migration bill attachments (irrelevant for a fresh deployment).
+- The `visibility` column on `document_registry` is carried over in the schema but, same as legacy,
+  is written on insert and never read/enforced — every document is Committee-visible via RLS
+  regardless of its value.
+
 ## Getting started
 
 ```bash
@@ -310,6 +338,7 @@ src/
     tournaments/      Tournaments module (auto-provisioned only, no create UI)
     staff/            Staff Master + Location Classification (CSV import only, see notes above)
     leaderboard/      Leaderboard (computed, no dedicated schema)
+    documents/        Documents (manual library + read-only Reimbursements evidence view)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)

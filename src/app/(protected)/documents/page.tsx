@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function documentsPage() {
-  return <Placeholder title="Documents" />;
+import { DocumentsPage } from '../../../features/documents/DocumentsPage';
+
+export default function DocumentsRoute() {
+  return <DocumentsPage />;
 }
