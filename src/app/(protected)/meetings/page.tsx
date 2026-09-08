@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function meetingsPage() {
-  return <Placeholder title="Meetings" />;
+import { MeetingsPage } from '../../../features/meetings/MeetingsPage';
+
+export default function MeetingsRoute() {
+  return <MeetingsPage />;
 }

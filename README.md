@@ -21,10 +21,10 @@ preserves the original business logic before moving to the next.
 | Auth, layout shell, navigation | ✅ Migrated |
 | Events & Activities | ✅ Migrated (core CRUD, tasks, attendance, lifecycle automation) |
 | Committee | ✅ Migrated (roster, assign/vacate, positions & structure admin, club-wide term) |
+| Meetings | ✅ Migrated (agenda, attendance, decisions, actions, minutes, agenda→Event creation) |
 | Tournaments | ⏳ Not yet migrated — placeholder page |
 | Finance | ⏳ Not yet migrated — placeholder page |
 | Reimbursements | ⏳ Not yet migrated — placeholder page |
-| Meetings | ⏳ Not yet migrated — placeholder page |
 | Leaderboard | ⏳ Not yet migrated — placeholder page |
 | Communication | ⏳ Not yet migrated — placeholder page |
 | Documents | ⏳ Not yet migrated — placeholder page |
@@ -42,9 +42,11 @@ by this app and can be deleted once migration is complete.
   plus the `Cancelled` state) is ported faithfully **except** for the Finance-approval condition,
   since the Finance module hasn't been migrated yet — once it is, `eventLifecycle()` in
   `src/features/events/lifecycle.ts` needs the `financeReady` check restored.
-- Attendance bulk import from Excel and the meeting-agenda → event creation linkage are not yet
-  ported (both depend on modules not yet migrated: attendance Excel import needs the `xlsx`
-  library wiring, agenda linkage needs the Meetings module).
+- Attendance bulk import from Excel is not yet ported (needs the `xlsx` library wiring). The
+  meeting-agenda → event creation linkage *is* now wired (see the Meetings module below), but only
+  one-way and simplified: creating an Event from an agenda item pre-fills name/description/
+  coordinator and stamps `source_meeting_*`/`source_agenda_*` on the new Event row directly,
+  rather than the legacy flow's "switch to Events, open the create form pre-filled, save" UX.
 - Writes go straight to Supabase from the browser (no more localStorage-as-source-of-truth +
   debounced sync queue) — this is an intentional architectural simplification enabled by the
   rewrite, not a temporary gap.
@@ -64,6 +66,28 @@ by this app and can be deleted once migration is complete.
   calling the `is_committee_user()` RPC directly (exposed as `isCommitteeUser` on `useAuth()`) —
   this removes the risk of the client list drifting from the SQL source of truth, which had
   already happened once in the legacy code (see migration history around `023_*`).
+
+### Known simplifications vs. the legacy build (Meetings module)
+
+- All meeting/agenda/decision/action ids are `crypto.randomUUID()` text values rather than the
+  legacy build's composite scheme (`"{meetingId}:A:{itemId}"` etc.) — that scheme existed only to
+  make client-generated `Date.now()` ids collision-safe across tables during localStorage→Supabase
+  sync, which no longer applies now that writes go straight to Supabase.
+  `meeting_attendees`/`meeting_action_history` already had real `uuid` PKs upstream and are
+  untouched.
+  - `events.id` is the one exception, still a `Date.now()`-based string on creation — see the
+    Events module notes above; unchanged here since it's Events' own convention.
+- The action↔event-task sync is one-way (meeting action → linked Event task), matching the legacy
+  behavior exactly: editing the mirrored task directly on the Event side does not sync back.
+- Minutes are print/export via the browser print dialog only (`window.print()` on a generated
+  document), same as the legacy build — there's no PDF/Word export library wired up.
+- Carry-forward (seeding a new meeting's agenda from other meetings' unresolved actions) is
+  included but simplified to a plain checklist in the Schedule Meeting form, rather than the
+  legacy's separate "Needs Discussion" agenda-item styling driven by extra `carryForward`/
+  `sourceMeetingId` provenance fields (those fields are still written to `meeting_agenda`, just not
+  yet rendered with distinct styling).
+- No dashboard integration yet (attention items, calendar dots, "next meeting" card) — the
+  Dashboard page itself is still a placeholder-level page pending its own migration pass.
 
 ## Getting started
 
@@ -100,6 +124,7 @@ src/
   features/
     events/           Events & Activities module (fully migrated)
     committee/        Committee module (fully migrated)
+    meetings/         Meetings module (fully migrated)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)

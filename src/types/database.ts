@@ -146,6 +146,112 @@ export interface EventTypeRow {
   created_at: string;
 }
 
+export interface MeetingRow {
+  id: string;
+  title: string;
+  meeting_type: string | null;
+  meeting_date: string | null;
+  meeting_time: string | null;
+  location: string | null;
+  chair: string | null;
+  secretary: string | null;
+  purpose: string | null;
+  status: string | null;
+  minutes_finalized: boolean;
+  minutes_finalized_at: string | null;
+  cancelled: boolean;
+  cancelled_at: string | null;
+  minutes: string | null;
+  created_by: string | null;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingAttendeeRow {
+  id: string;
+  meeting_id: string;
+  source_key: string;
+  committee_id: string | null;
+  attendee_name: string;
+  attendee_uid: string | null;
+  attendee_role: string | null;
+  attendance_status: string | null;
+  data: Record<string, unknown>;
+}
+
+export interface MeetingAgendaRow {
+  id: string;
+  source_key: string;
+  meeting_id: string;
+  sort_order: number;
+  title: string;
+  owner: string | null;
+  minutes_allocated: number;
+  outcome: string | null;
+  details: string | null;
+  discussion: string | null;
+  event_id: string | null;
+  finance_id: string | null;
+  created_event_id: string | null;
+  carry_forward: boolean;
+  source_meeting_id: string | null;
+  source_meeting_title: string | null;
+  source_agenda_id: string | null;
+  source_agenda_title: string | null;
+  source_action_id: string | null;
+  source_action_text: string | null;
+  created_at: string;
+  data: Record<string, unknown>;
+}
+
+export interface MeetingDecisionRow {
+  id: string;
+  source_key: string;
+  meeting_id: string;
+  agenda_id: string | null;
+  decision_text: string;
+  outcome: string | null;
+  owner: string | null;
+  event_id: string | null;
+  created_at: string;
+  data: Record<string, unknown>;
+}
+
+export interface MeetingActionRow {
+  id: string;
+  source_key: string;
+  meeting_id: string;
+  agenda_id: string | null;
+  action_text: string;
+  assigned_to: string | null;
+  assigned_role: string | null;
+  due_date: string | null;
+  priority: string | null;
+  status: string;
+  done: boolean;
+  event_id: string | null;
+  remarks: string | null;
+  progress_note: string | null;
+  carried_forward_from: string | null;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingActionHistoryRow {
+  id: string;
+  meeting_action_id: string;
+  action: string | null;
+  old_status: string | null;
+  new_status: string | null;
+  remarks: string | null;
+  changed_by: string | null;
+  actor_name: string | null;
+  changed_at: string;
+  data: Record<string, unknown>;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -165,6 +271,24 @@ export interface Database {
       };
       app_settings: { Row: AppSettingRow; Insert: Partial<AppSettingRow>; Update: Partial<AppSettingRow> };
       staff: { Row: StaffRow; Insert: Partial<StaffRow>; Update: Partial<StaffRow> };
+      meetings: { Row: MeetingRow; Insert: Partial<MeetingRow>; Update: Partial<MeetingRow> };
+      meeting_attendees: {
+        Row: MeetingAttendeeRow;
+        Insert: Partial<MeetingAttendeeRow>;
+        Update: Partial<MeetingAttendeeRow>;
+      };
+      meeting_agenda: { Row: MeetingAgendaRow; Insert: Partial<MeetingAgendaRow>; Update: Partial<MeetingAgendaRow> };
+      meeting_decisions: {
+        Row: MeetingDecisionRow;
+        Insert: Partial<MeetingDecisionRow>;
+        Update: Partial<MeetingDecisionRow>;
+      };
+      meeting_actions: { Row: MeetingActionRow; Insert: Partial<MeetingActionRow>; Update: Partial<MeetingActionRow> };
+      meeting_action_history: {
+        Row: MeetingActionHistoryRow;
+        Insert: Partial<MeetingActionHistoryRow>;
+        Update: Partial<MeetingActionHistoryRow>;
+      };
     };
   };
 }
