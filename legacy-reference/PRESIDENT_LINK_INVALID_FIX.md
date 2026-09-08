@@ -1,0 +1,1 @@
+Fixes President secure links that were rejected when the normalized token column and the compatibility JSON snapshot were out of sync. Run migration 014, redeploy expense-approval, then redeploy Vercel. New President emails are now sent only after the exact token is read back and verified from Supabase.
