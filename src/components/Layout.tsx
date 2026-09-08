@@ -149,9 +149,9 @@ export function Layout({ children }: { children: ReactNode }) {
                           fontSize: 12.5,
                           fontWeight: 600,
                           padding: '7px 12px',
-                          borderRadius: 10,
-                          color: pathname === sub.to ? '#fff' : 'oklch(85% 0.02 60 / 0.55)',
-                          background: pathname === sub.to ? 'oklch(100% 0 0 / 0.08)' : 'transparent',
+                          borderRadius: 8,
+                          color: pathname === sub.to ? 'var(--ub-ink)' : 'var(--ub-ink-faint)',
+                          background: pathname === sub.to ? 'var(--ub-surface-3)' : 'transparent',
                         }}
                       >
                         {sub.label}
@@ -171,10 +171,10 @@ export function Layout({ children }: { children: ReactNode }) {
             {initials(profile?.full_name || 'U')}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ color: 'var(--ub-cream)', fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ color: 'var(--ub-ink)', fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {profile?.full_name || 'Signing in…'}
             </div>
-            <div style={{ color: 'oklch(85% 0.02 60 / 0.55)', fontSize: 11.5 }}>{profile?.role || 'UnitedBML User'}</div>
+            <div style={{ color: 'var(--ub-ink-faint)', fontSize: 11.5 }}>{profile?.role || 'UnitedBML User'}</div>
           </div>
           <button title="Sign out" onClick={() => void signOut()}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
