@@ -358,6 +358,96 @@ export interface ExpenseReversalRow {
   data: Record<string, unknown>;
 }
 
+export interface ReimbursementCaseRow {
+  id: string;
+  case_ref: string | null;
+  reference_no: string | null;
+  expense_request_id: string | null;
+  expense_request_number: string | null;
+  expense_line_no: number | null;
+  event_id: string | null;
+  event_name: string | null;
+  expense_item: string | null;
+  approved_item_amount: number;
+  route: string;
+  status: string;
+  reason: string | null;
+  expected_expense_date: string | null;
+  notes: string | null;
+  requested_by: string | null;
+  procurement_manager_email: string | null;
+  procurement_head_email: string | null;
+  email_reference: string | null;
+  email_attachment_name: string | null;
+  email_prepared_at: string | null;
+  email_sent_at: string | null;
+  procurement_comment: string | null;
+  procurement_response_by: string | null;
+  procurement_response_date: string | null;
+  exception_ref: string | null;
+  exception_reason: string | null;
+  exception_remarks: string | null;
+  exception_expense_date: string | null;
+  recorded_by: string | null;
+  recorded_at: string | null;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReimbursementHistoryRow {
+  id: string;
+  reimbursement_id: string;
+  action: string | null;
+  status: string | null;
+  remarks: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  created_at: string;
+  data: Record<string, unknown>;
+}
+
+export interface ApBatchRow {
+  id: string;
+  reimbursement_id: string;
+  submission_ref: string | null;
+  submission_date: string | null;
+  status: string;
+  ap_email: string | null;
+  email_remarks: string | null;
+  bills_attachment_name: string | null;
+  bills_attachment_type: string | null;
+  bills_attachment_stored: boolean;
+  bills_attachment_path: string | null;
+  sent_at: string | null;
+  status_date: string | null;
+  status_remarks: string | null;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApBillRow {
+  id: string;
+  ap_batch_id: string;
+  line_no: number;
+  bill_date: string | null;
+  vendor_number: string | null;
+  vendor_name: string | null;
+  worker_id: string | null;
+  amount: number;
+  data: Record<string, unknown>;
+}
+
+export interface VendorMasterRow {
+  vendor_account: string;
+  name: string;
+  worker_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -412,6 +502,19 @@ export interface Database {
         Insert: Partial<ExpenseReversalRow>;
         Update: Partial<ExpenseReversalRow>;
       };
+      reimbursement_cases: {
+        Row: ReimbursementCaseRow;
+        Insert: Partial<ReimbursementCaseRow>;
+        Update: Partial<ReimbursementCaseRow>;
+      };
+      reimbursement_history: {
+        Row: ReimbursementHistoryRow;
+        Insert: Partial<ReimbursementHistoryRow>;
+        Update: Partial<ReimbursementHistoryRow>;
+      };
+      ap_batches: { Row: ApBatchRow; Insert: Partial<ApBatchRow>; Update: Partial<ApBatchRow> };
+      ap_bills: { Row: ApBillRow; Insert: Partial<ApBillRow>; Update: Partial<ApBillRow> };
+      vendor_master: { Row: VendorMasterRow; Insert: Partial<VendorMasterRow>; Update: Partial<VendorMasterRow> };
     };
   };
 }

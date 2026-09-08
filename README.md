@@ -22,9 +22,9 @@ preserves the original business logic before moving to the next.
 | Events & Activities | ✅ Migrated (core CRUD, tasks, attendance, lifecycle automation) |
 | Committee | ✅ Migrated (roster, assign/vacate, positions & structure admin, club-wide term) |
 | Meetings | ✅ Migrated (agenda, attendance, decisions, actions, minutes, agenda→Event creation) |
-| Finance | ✅ Migrated (requests, President/Final approval chain, reversals, budget tracking) — AP/Contingency/vendor master deferred, see below |
+| Finance | ✅ Migrated (requests, President/Final approval chain, reversals, budget tracking) — Contingency deferred, see below |
+| Reimbursements | ✅ Migrated (Procurement pre-approval, exceptions, AP batches/bills, vendor master, status tracking) |
 | Tournaments | ⏳ Not yet migrated — placeholder page |
-| Reimbursements | ⏳ Not yet migrated — placeholder page |
 | Leaderboard | ⏳ Not yet migrated — placeholder page |
 | Communication | ⏳ Not yet migrated — placeholder page |
 | Documents | ⏳ Not yet migrated — placeholder page |
@@ -98,10 +98,10 @@ This module is scoped to the **core expense request lifecycle** — creation, Pr
 recommendation, final approval, rejection, cancellation, reversal, and budget-utilization tracking.
 Several substantial legacy sub-systems are **deferred, not ported**:
 
-- **Accounts Payable (AP) batches/bills and Reimbursements** (`ap_batches`, `ap_bills`,
-  `reimbursement_cases`, `reimbursement_history`, vendor master) are a separate nav module in the
+- **Accounts Payable (AP) batches/bills and Reimbursements** are a separate nav module in the
   legacy build (`data-view="reimbursements"`) and out of scope here — Finance only reads
-  `expense_requests`/`expense_lines`/`budgets`.
+  `expense_requests`/`expense_lines`/`budgets`. See the Reimbursements section below — it's now
+  migrated as its own module.
 - **Contingency-use requests** (`contingency_requests`, the Procurement pre-approval workflow, the
   President-notification emails) are not implemented. The 5% contingency reserve is computed and
   stored on each request (`contingency_amount`), but there's no UI yet to draw down against it
@@ -123,6 +123,43 @@ Several substantial legacy sub-systems are **deferred, not ported**:
   server-side even if the client got the gating wrong.
 - Expense request/line/approval ids are `crypto.randomUUID()` (or DB defaults), matching the
   Committee/Meetings modules' approach — not the legacy's `Date.now()`-based scheme.
+
+### Known simplifications vs. the legacy build (Reimbursements module)
+
+Covers the full case pipeline: eligible-item discovery, grouped Procurement pre-approval (one
+request per Expense Request, fanning out into per-line cases on approval), the Exception route
+(bypass Procurement with a recorded reason), AP batch/bill entry with vendor-master typeahead and
+Combined/Individual attachment modes, and AP status tracking (Sent to AP → Processing → Paid /
+Returned / Cancelled). The legacy build's dead `financeReimbursements` pane (embedded in Finance's
+DOM but unreachable — no tab button ever pointed at it, see the legacy `renderReimbursements()`)
+was not ported; only the real, reachable `data-view="reimbursements"` module was.
+
+- **No email sending.** The legacy build generates a PDF and sends real emails (Procurement
+  pre-approval request, AP batch submission) via the same Gmail Supabase Edge Function used
+  elsewhere. This rewrite skips actual email dispatch entirely, consistent with Finance's approval
+  emails also being skipped — "Send for Pre-Approval" and "Save & Send to AP" just transition
+  status and stamp timestamps/references; a person still has to communicate with Procurement/AP
+  through some channel today. Wiring the real Edge Function send is a natural next step once the
+  Documents/Communication modules (which likely share attachment/PDF tooling) are in scope.
+- **Single-send protection is simplified** to one re-check of the batch's current status
+  immediately before flipping it to `Sent to AP` (blocks a double-click/stale-tab resend). The
+  legacy build's three-layer guard (in-memory mutex, a 2-minute stale-lock timestamp for
+  crashed sends, and a server-side idempotency key passed to the email provider) doesn't apply
+  here since there's no actual async email step to protect against yet — this can be revisited
+  once real sending is added.
+- **External Event Official self-service reimbursements** (`external_event_reimbursements`, the
+  RPCs `submit_external_event_reimbursement`/`decide_external_event_reimbursement`, and the
+  approval card that surfaces them at the top of the Reimbursements page) are not ported — they
+  belong to the not-yet-migrated Participant Portal.
+- **Reports tab** (CSV export, print-friendly summary report) is not ported.
+- **Event-actuals reconciliation** (`event_actual_expenses`, matching `Paid` AP bill totals back
+  onto approved expense lines so Events' post-event settlement shows real actuals) is not wired up
+  — same gap already noted under Finance/Events; this module now produces the `Paid` AP data that
+  reconciliation would consume, but nothing reads it back yet.
+- `reimbursement_cases` intentionally keeps the legacy's dual-shape design (a `data.isProcurementGroup`
+  flag distinguishes a pre-split group record from a per-line case) rather than splitting it into
+  two tables, to avoid a schema migration — `features/reimbursements/types.ts`'s
+  `ProcurementGroupCase` documents the distinction in code instead.
 
 ## Getting started
 
@@ -160,7 +197,8 @@ src/
     events/           Events & Activities module (fully migrated)
     committee/        Committee module (fully migrated)
     meetings/         Meetings module (fully migrated)
-    finance/          Finance module (core expense/approval lifecycle; AP/Contingency deferred)
+    finance/          Finance module (core expense/approval lifecycle; Contingency deferred)
+    reimbursements/   Reimbursements/AP module (no email dispatch; see notes above)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)

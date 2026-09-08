@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function reimbursementsPage() {
-  return <Placeholder title="Reimbursements" />;
+import { ReimbursementsPage } from '../../../features/reimbursements/ReimbursementsPage';
+
+export default function ReimbursementsRoute() {
+  return <ReimbursementsPage />;
 }
