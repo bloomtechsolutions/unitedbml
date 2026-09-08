@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function settingsPage() {
-  return <Placeholder title="Settings" />;
+import { SettingsPage } from '../../../features/settings/SettingsPage';
+
+export default function SettingsRoute() {
+  return <SettingsPage />;
 }

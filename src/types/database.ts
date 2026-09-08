@@ -15,6 +15,7 @@ export interface Profile {
   status: string;
   member_uid: string | null;
   contact_no: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 }

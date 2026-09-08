@@ -29,6 +29,7 @@ preserves the original business logic before moving to the next.
 | Leaderboard | ✅ Migrated (computed ranking — no dedicated schema, see below) |
 | Documents | ✅ Migrated (upload/browse/delete library + read-only Procurement/AP evidence view) |
 | Reports | ✅ Migrated (all 15 catalog reports — filters, CSV export, print) |
+| Settings | ✅ Migrated (profile self-service, My Committee Leave, password change, session management) |
 | Communication | ⏳ Not yet migrated — placeholder page |
 | Participant Portal / external approval pages | ⏳ Not yet migrated |
 
@@ -61,8 +62,8 @@ by this app and can be deleted once migration is complete.
   (`parentId`/`displayOrder`, stored in `committee_members.data` jsonb same as the legacy build,
   since those were never normalized into columns), just not rendered as a visual tree yet.
 - Self-service "My Committee Leave" (the `update_my_committee_leave`/`clear_my_committee_leave`
-  RPCs) lives on the legacy Settings page, not the Committee page itself, and Settings hasn't been
-  migrated yet — deferred until then.
+  RPCs) lives on the legacy Settings page, not the Committee page itself — now ported, see the
+  Settings section below.
 - `committee_leave_history` has no writer in the legacy app either (dead/unfinished audit-log
   table) — not wired up here, same as upstream.
 - The `COMMITTEE_APP_ROLES` client-side role allow-list from the legacy build is replaced by
@@ -337,6 +338,28 @@ auto-summed KPI strip over the first 4 numeric/money columns.
   matching legacy's same all-rows-in-one-table approach — fine at current data volumes, worth
   revisiting if any table grows large.
 
+### Known simplifications vs. the legacy build (Settings module)
+
+- **Profile edits go through the `update_my_profile` RPC**, not a direct `profiles` table write —
+  matching legacy's pattern and the RLS setup, where `profiles` only allows Administrators to write
+  directly and self-service edits (display name, member/staff ID, contact number, avatar URL) must
+  go through the security-definer RPC. Email, role, and account status remain read-only in this UI,
+  same as legacy.
+- **Profile Photo URL is a plain external URL field**, not a Storage upload — same as legacy, which
+  never wired an avatar upload flow either despite having a `profiles.avatar_url` column.
+- **Password strength meter is cosmetic only** (a client-side length/case/digit/symbol heuristic
+  score), matching legacy — it doesn't enforce a minimum beyond Supabase Auth's own 8-character
+  rule, and changing the password re-authenticates with the current password first via
+  `signInWithPassword` before calling `auth.updateUser`, same flow as legacy.
+- **"My Committee Leave" section is conditionally rendered** only for committee members
+  (`get_my_committee_leave` RPC's `isCommitteeMember` flag), reusing the same three RPCs
+  (`get_my_committee_leave`/`update_my_committee_leave`/`clear_my_committee_leave`) introduced in
+  migration `030` — this closes the gap noted in the Committee module section above.
+- **No account deactivation/deletion self-service**, matching legacy — account status changes
+  remain an Administrator-only action elsewhere in the app.
+- **"Sign Out Other Sessions"** uses Supabase Auth's `signOut({ scope: 'others' })`, equivalent to
+  legacy's same-purpose action.
+
 ## Getting started
 
 ```bash
@@ -380,6 +403,7 @@ src/
     leaderboard/      Leaderboard (computed, no dedicated schema)
     documents/        Documents (manual library + read-only Reimbursements evidence view)
     reports/          Reports hub — all 15 catalog reports, CSV export, shared print helper
+    settings/         Settings (profile self-service, My Committee Leave, password, sessions)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)

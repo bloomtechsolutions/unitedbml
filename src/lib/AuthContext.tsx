@@ -12,6 +12,7 @@ interface AuthState {
   isAdministrator: boolean;
   isCommitteeUser: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -84,6 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const refreshProfile = async () => {
+    if (!session) return;
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to refresh profile', error);
+      return;
+    }
+    setProfile(data ?? null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -93,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdministrator: profile?.role === 'Administrator',
         isCommitteeUser,
         signOut,
+        refreshProfile,
       }}
     >
       {children}
