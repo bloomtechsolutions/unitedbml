@@ -30,8 +30,8 @@ preserves the original business logic before moving to the next.
 | Documents | ✅ Migrated (upload/browse/delete library + read-only Procurement/AP evidence view) |
 | Reports | ✅ Migrated (all 15 catalog reports — filters, CSV export, print) |
 | Settings | ✅ Migrated (profile self-service, My Committee Leave, password change, session management) |
-| Communication | ⏳ Not yet migrated — placeholder page |
-| Participant Portal / external approval pages | ⏳ Not yet migrated |
+| Communication | ❌ Removed from scope (product decision — not part of this rewrite) |
+| Participant Portal | ⏳ Not yet migrated |
 
 The legacy `index.html` build (fully functional, all modules) is kept under `legacy-reference/`
 purely as a source-of-truth reference while the rest of the modules are ported — it is not served
@@ -112,11 +112,13 @@ Several substantial legacy sub-systems are **deferred, not ported**:
   in the schema but nothing writes to it yet.
 - **The secure, no-login public approval-link flow** (token-issued via the `expense-approval`
   Supabase Edge Function, letting the President/Final Approver decide via an emailed link without
-  signing in) is not implemented. All approval decisions in this rewrite happen in-app, from an
-  authenticated session — the `guard_expense_approval_transition()` DB trigger enforces the same
-  rules either way, so this is a pure UI/access-path gap, not a data-integrity one. It's a
-  legitimately separate concern (a public route + Edge Function/service-role path, not normal
-  RLS-scoped client queries) worth its own future pass rather than folding into this one.
+  signing in) is **intentionally not implemented — by product decision, not deferred as a gap.**
+  All approval decisions in this rewrite happen in-app, from an authenticated session; every
+  approver is expected to log in normally rather than act via an anonymous emailed link. The
+  `guard_expense_approval_transition()` DB trigger enforces the same rules either way, so no
+  data-integrity behavior is lost — this rewrite simply never adds the public/anonymous route or
+  wires the Edge Function's token-based access path. The same decision applies to the legacy
+  Participant Portal's External Event Official reimbursement flow — see that section below.
 - Approval-stage permission checks in the UI are client-side conveniences (hide/show the
   Recommend/Approve buttons based on `profile.role`/email match) — the real enforcement is the
   `guard_expense_approval_transition()` Postgres trigger (see
@@ -140,8 +142,9 @@ was not ported; only the real, reachable `data-view="reimbursements"` module was
   elsewhere. This rewrite skips actual email dispatch entirely, consistent with Finance's approval
   emails also being skipped — "Send for Pre-Approval" and "Save & Send to AP" just transition
   status and stamp timestamps/references; a person still has to communicate with Procurement/AP
-  through some channel today. Wiring the real Edge Function send is a natural next step once the
-  Documents/Communication modules (which likely share attachment/PDF tooling) are in scope.
+  through some channel today. Wiring the real Edge Function send is a natural next step, though the
+  legacy Communication module that would have shared attachment/PDF tooling here is out of scope
+  for this rewrite (product decision — see the Status table above).
 - **Single-send protection is simplified** to one re-check of the batch's current status
   immediately before flipping it to `Sent to AP` (blocks a double-click/stale-tab resend). The
   legacy build's three-layer guard (in-memory mutex, a 2-minute stale-lock timestamp for
