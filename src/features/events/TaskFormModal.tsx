@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import type { EventTaskRow } from '../../types/database';

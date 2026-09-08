@@ -1,9 +1,15 @@
 # UnitedBML Management Hub
 
-Modernized rebuild of the UnitedBML club management application: Vite + React + TypeScript on the
-frontend, Supabase (Postgres + Auth) on the backend. This replaces the previous architecture, a
-single ~12,500-line `index.html` file with vanilla JS DOM rendering (preserved for reference in
-`legacy-reference/`), with a component-based, typed codebase migrated module by module.
+Modernized rebuild of the UnitedBML club management application: Next.js (App Router) + React +
+TypeScript on the frontend, Supabase (Postgres + Auth) on the backend. This replaces the previous
+architecture, a single ~12,500-line `index.html` file with vanilla JS DOM rendering (preserved for
+reference in `legacy-reference/`), with a component-based, typed codebase migrated module by
+module.
+
+Auth state is Supabase-session-based and entirely client-side for now (every route under
+`src/app/(protected)/` is a client component gated by `ProtectedLayout`) — there is no
+server-rendered/SSR auth via `@supabase/ssr` middleware yet. That would be a good follow-up once
+more modules are migrated and page weight starts to matter.
 
 ## Status
 
@@ -47,29 +53,37 @@ by this app and can be deleted once migration is complete.
 
 ```bash
 npm install
-cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+cp .env.example .env.local   # fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
 npm run dev
 ```
+
+Other scripts: `npm run build` (production build), `npm start` (serve the production build),
+`npm run typecheck` (`tsc --noEmit`), `npm run lint` (oxlint).
 
 ## Backend
 
 The Supabase schema, RLS policies, RPCs, and Edge Functions are unchanged from the legacy build —
 see `supabase/migrations/` and `supabase/functions/`. Run them against a Supabase project as
-documented in `legacy-reference/README.md` and `legacy-reference/VERCEL_DEPLOYMENT.md` (Vercel
-proxy config `api/config.js` is no longer needed: this app reads Supabase credentials from
-`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` at build time instead of a serverless function, since
-the anon key is safe to ship to the client).
+documented in `legacy-reference/README.md` and `legacy-reference/VERCEL_DEPLOYMENT.md` (the old
+Vercel proxy config `api/config.js` is no longer needed: this app reads Supabase credentials from
+`NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` at build time instead of a serverless
+function, since the anon key is safe to ship to the client). Deploys natively on Vercel with zero
+extra config — no `vercel.json` rewrite rules needed, unlike the old SPA build.
 
 ## Project layout
 
 ```
 src/
-  lib/            Supabase client, auth context, toast context
-  components/     Shared UI (layout shell, modal)
-  pages/          Top-level routed pages (dashboard, login, placeholders)
+  app/                Next.js App Router routes
+    (protected)/      Auth-gated routes: dashboard, events, and placeholder pages, wrapped by layout.tsx
+    login/             Login page
+    layout.tsx, providers.tsx, globals.css, legacy.css
+  lib/                Supabase client, auth context, toast context
+  components/         Shared UI (layout shell, modal)
+  shared/             Small shared components (Placeholder)
   features/
-    events/       Events & Activities module (fully migrated)
-  types/          Hand-written Supabase row types
-legacy-reference/ Original v13.15 index.html build, kept for migrating remaining modules
-supabase/         Migrations and Edge Functions (unchanged from legacy)
+    events/           Events & Activities module (fully migrated)
+  types/              Hand-written Supabase row types
+legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
+supabase/             Migrations and Edge Functions (unchanged from legacy)
 ```

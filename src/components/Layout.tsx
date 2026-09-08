@@ -1,4 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom';
+"use client";
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { useAuth } from '../lib/AuthContext';
 
 interface NavItem {
@@ -45,8 +49,9 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-export function Layout() {
+export function Layout({ children }: { children: ReactNode }) {
   const { profile, isAdministrator, signOut } = useAuth();
+  const pathname = usePathname();
 
   return (
     <div className="app">
@@ -67,10 +72,10 @@ export function Layout() {
               {group.items
                 .filter((item) => !item.adminOnly || isAdministrator)
                 .map((item) => (
-                  <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <Link key={item.to} href={item.to} className={pathname === item.to ? 'active' : ''}>
                     <span>{item.icon}</span>
                     <span className="txt">{item.label}</span>
-                  </NavLink>
+                  </Link>
                 ))}
             </div>
           ))}
@@ -96,9 +101,7 @@ export function Layout() {
           </div>
           <div className="top-actions" />
         </div>
-        <div className="main">
-          <Outlet />
-        </div>
+        <div className="main">{children}</div>
       </div>
     </div>
   );

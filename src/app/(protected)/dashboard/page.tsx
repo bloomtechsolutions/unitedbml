@@ -1,6 +1,8 @@
-import { useAuth } from '../lib/AuthContext';
+'use client';
 
-export function Dashboard() {
+import { useAuth } from '../../../lib/AuthContext';
+
+export default function DashboardPage() {
   const { profile } = useAuth();
   return (
     <div>

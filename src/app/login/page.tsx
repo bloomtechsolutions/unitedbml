@@ -1,7 +1,11 @@
-import { useState, type FormEvent } from 'react';
-import { supabase } from '../lib/supabase';
+'use client';
 
-export function Login() {
+import { useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '../../lib/supabase';
+
+export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +17,11 @@ export function Login() {
     setLoading(true);
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (signInError) setError(signInError.message);
+    if (signInError) {
+      setError(signInError.message);
+      return;
+    }
+    router.replace('/dashboard');
   };
 
   return (

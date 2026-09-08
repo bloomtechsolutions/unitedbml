@@ -1,3 +1,5 @@
+"use client";
+
 export function Placeholder({ title }: { title: string }) {
   return (
     <div className="page-head">

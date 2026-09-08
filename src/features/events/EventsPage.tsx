@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from 'react';
 import { useToast } from '../../lib/ToastContext';
 import type { EventRow } from '../../types/database';
