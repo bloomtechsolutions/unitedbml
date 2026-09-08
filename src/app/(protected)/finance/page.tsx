@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../shared/Placeholder';
+'use client';
 
-export default function financePage() {
-  return <Placeholder title="Finance" />;
+import { FinancePage } from '../../../features/finance/FinancePage';
+
+export default function FinanceRoute() {
+  return <FinancePage />;
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import type { EventTaskRow } from '../../types/database';
 import { useToast } from '../../lib/ToastContext';
+import { useEventFinanceSummary } from '../finance/useFinance';
 import {
   daysUntilEvent,
   eventLifecycle,
@@ -41,13 +42,15 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
   const [editingTask, setEditingTask] = useState<EventTaskRow | null>(null);
   const [staffQuery, setStaffQuery] = useState('');
   const staffResults = useStaffSearch(staffQuery);
+  const { statusByEvent: financeByEvent } = useEventFinanceSummary();
   const toast = useToast();
 
   if (!event) return null;
 
-  const lifecycle = eventLifecycle(event, event.tasks);
-  const readiness = eventReadiness(event, event.tasks);
-  const alertText = eventLifecycleAlert(event, event.tasks);
+  const finance = financeByEvent.get(event.id) ?? { hasApproved: false, hasPending: false };
+  const lifecycle = eventLifecycle(event, event.tasks, finance);
+  const readiness = eventReadiness(event, event.tasks, finance);
+  const alertText = eventLifecycleAlert(event, event.tasks, finance);
   const prep = eventPreparationProgress(event.tasks);
   const days = daysUntilEvent(event);
 

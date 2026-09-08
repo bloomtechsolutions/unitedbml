@@ -22,8 +22,8 @@ preserves the original business logic before moving to the next.
 | Events & Activities | ✅ Migrated (core CRUD, tasks, attendance, lifecycle automation) |
 | Committee | ✅ Migrated (roster, assign/vacate, positions & structure admin, club-wide term) |
 | Meetings | ✅ Migrated (agenda, attendance, decisions, actions, minutes, agenda→Event creation) |
+| Finance | ✅ Migrated (requests, President/Final approval chain, reversals, budget tracking) — AP/Contingency/vendor master deferred, see below |
 | Tournaments | ⏳ Not yet migrated — placeholder page |
-| Finance | ⏳ Not yet migrated — placeholder page |
 | Reimbursements | ⏳ Not yet migrated — placeholder page |
 | Leaderboard | ⏳ Not yet migrated — placeholder page |
 | Communication | ⏳ Not yet migrated — placeholder page |
@@ -39,9 +39,12 @@ by this app and can be deleted once migration is complete.
 ### Known simplifications vs. the legacy build (Events module)
 
 - Event lifecycle automation (`Planning → Ready → Event Day → Post-Event Settlement → Closed`,
-  plus the `Cancelled` state) is ported faithfully **except** for the Finance-approval condition,
-  since the Finance module hasn't been migrated yet — once it is, `eventLifecycle()` in
-  `src/features/events/lifecycle.ts` needs the `financeReady` check restored.
+  plus the `Cancelled` state) is now ported in full, including the Finance-approval condition —
+  `eventLifecycle()`/`eventReadiness()`/`eventLifecycleAlert()` in `src/features/events/lifecycle.ts`
+  take a `FinanceStatus` computed by `features/finance/useFinance.ts`'s `useEventFinanceSummary()`
+  (a lightweight `expense_requests` query, separate from the full Finance page). Post-event actuals
+  reconciliation (`event_actual_expenses`, the "Settlements" screen) is still not migrated — see the
+  Finance section below.
 - Attendance bulk import from Excel is not yet ported (needs the `xlsx` library wiring). The
   meeting-agenda → event creation linkage *is* now wired (see the Meetings module below), but only
   one-way and simplified: creating an Event from an agenda item pre-fills name/description/
@@ -89,6 +92,38 @@ by this app and can be deleted once migration is complete.
 - No dashboard integration yet (attention items, calendar dots, "next meeting" card) — the
   Dashboard page itself is still a placeholder-level page pending its own migration pass.
 
+### Known simplifications vs. the legacy build (Finance module)
+
+This module is scoped to the **core expense request lifecycle** — creation, President
+recommendation, final approval, rejection, cancellation, reversal, and budget-utilization tracking.
+Several substantial legacy sub-systems are **deferred, not ported**:
+
+- **Accounts Payable (AP) batches/bills and Reimbursements** (`ap_batches`, `ap_bills`,
+  `reimbursement_cases`, `reimbursement_history`, vendor master) are a separate nav module in the
+  legacy build (`data-view="reimbursements"`) and out of scope here — Finance only reads
+  `expense_requests`/`expense_lines`/`budgets`.
+- **Contingency-use requests** (`contingency_requests`, the Procurement pre-approval workflow, the
+  President-notification emails) are not implemented. The 5% contingency reserve is computed and
+  stored on each request (`contingency_amount`), but there's no UI yet to draw down against it
+  per-line.
+- **Post-event Settlements/Actuals reconciliation** (`event_actual_expenses`, matching AP bill
+  totals back to approved lines) is not implemented — Events' `actual_expense_total` field exists
+  in the schema but nothing writes to it yet.
+- **The secure, no-login public approval-link flow** (token-issued via the `expense-approval`
+  Supabase Edge Function, letting the President/Final Approver decide via an emailed link without
+  signing in) is not implemented. All approval decisions in this rewrite happen in-app, from an
+  authenticated session — the `guard_expense_approval_transition()` DB trigger enforces the same
+  rules either way, so this is a pure UI/access-path gap, not a data-integrity one. It's a
+  legitimately separate concern (a public route + Edge Function/service-role path, not normal
+  RLS-scoped client queries) worth its own future pass rather than folding into this one.
+- Approval-stage permission checks in the UI are client-side conveniences (hide/show the
+  Recommend/Approve buttons based on `profile.role`/email match) — the real enforcement is the
+  `guard_expense_approval_transition()` Postgres trigger (see
+  `supabase/migrations/020_extended_final_approvers.sql`), so an unauthorized action fails safely
+  server-side even if the client got the gating wrong.
+- Expense request/line/approval ids are `crypto.randomUUID()` (or DB defaults), matching the
+  Committee/Meetings modules' approach — not the legacy's `Date.now()`-based scheme.
+
 ## Getting started
 
 ```bash
@@ -125,6 +160,7 @@ src/
     events/           Events & Activities module (fully migrated)
     committee/        Committee module (fully migrated)
     meetings/         Meetings module (fully migrated)
+    finance/          Finance module (core expense/approval lifecycle; AP/Contingency deferred)
   types/              Hand-written Supabase row types
 legacy-reference/     Original v13.15 index.html build, kept for migrating remaining modules
 supabase/             Migrations and Edge Functions (unchanged from legacy)

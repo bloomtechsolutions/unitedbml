@@ -19,12 +19,20 @@ export function eventPreparationProgress(tasks: EventTaskRow[]): number {
 
 export type EventLifecycle = 'Closed' | 'Cancelled' | 'Post-Event Settlement' | 'Event Day' | 'Ready' | 'Planning';
 
+export interface FinanceStatus {
+  hasApproved: boolean;
+  hasPending: boolean;
+}
+
+const NO_FINANCE: FinanceStatus = { hasApproved: false, hasPending: false };
+
 /**
- * Finance approval state (event.planned_budget vs approved/pending expense requests) is not yet
- * wired up until the Finance module is migrated — budgetRequired always resolves financeReady=true.
- * This mirrors the original eventLifecycle() in index.html:5364 minus that one dependency.
+ * Mirrors the original eventLifecycle() in index.html:5364. `finance` comes from the Finance
+ * module (features/finance/useFinance.ts's eventFinanceStatus()/useEventFinanceSummary()) — when
+ * omitted (e.g. a caller that hasn't loaded Finance data), it defaults to "no finance data", which
+ * only changes the outcome when the event actually has a planned_budget > 0.
  */
-export function eventLifecycle(event: EventRow, tasks: EventTaskRow[]): EventLifecycle {
+export function eventLifecycle(event: EventRow, tasks: EventTaskRow[], finance: FinanceStatus = NO_FINANCE): EventLifecycle {
   if (event.archived) return 'Closed';
   if (event.cancelled_at || event.manual_state === 'Cancelled' || event.status === 'Cancelled') return 'Cancelled';
 
@@ -40,8 +48,10 @@ export function eventLifecycle(event: EventRow, tasks: EventTaskRow[]): EventLif
 
   if (event.event_date === today) return 'Event Day';
 
+  const budgetRequired = Number(event.planned_budget || 0) > 0;
+  const financeReady = !budgetRequired || (finance.hasApproved && !finance.hasPending);
   const allTasksComplete = tasks.length > 0 && prep === 100;
-  if (allTasksComplete) return 'Ready';
+  if (allTasksComplete && financeReady) return 'Ready';
 
   return 'Planning';
 }
@@ -64,8 +74,8 @@ export function syncedStatus(lifecycle: EventLifecycle): string {
 
 export type EventReadiness = 'Closed' | 'In Progress' | 'Needs Attention' | 'Ready' | 'At Risk';
 
-export function eventReadiness(event: EventRow, tasks: EventTaskRow[]): EventReadiness {
-  const lifecycle = eventLifecycle(event, tasks);
+export function eventReadiness(event: EventRow, tasks: EventTaskRow[], finance: FinanceStatus = NO_FINANCE): EventReadiness {
+  const lifecycle = eventLifecycle(event, tasks, finance);
   if (lifecycle === 'Closed' || lifecycle === 'Cancelled') return 'Closed';
   if (lifecycle === 'Event Day') return 'In Progress';
   if (lifecycle === 'Post-Event Settlement') return 'Needs Attention';
@@ -79,8 +89,8 @@ export function eventReadiness(event: EventRow, tasks: EventTaskRow[]): EventRea
   return 'Needs Attention';
 }
 
-export function eventLifecycleAlert(event: EventRow, tasks: EventTaskRow[]): string {
-  const lifecycle = eventLifecycle(event, tasks);
+export function eventLifecycleAlert(event: EventRow, tasks: EventTaskRow[], finance: FinanceStatus = NO_FINANCE): string {
+  const lifecycle = eventLifecycle(event, tasks, finance);
   const days = daysUntilEvent(event);
   const prep = eventPreparationProgress(tasks);
 
@@ -97,6 +107,10 @@ export function eventLifecycleAlert(event: EventRow, tasks: EventTaskRow[]): str
     const reasons: string[] = [];
     if (tasks.length === 0) reasons.push('no preparation tasks have been assigned');
     else if (prep < 100) reasons.push(`preparation is ${prep}% complete`);
+    if (Number(event.planned_budget || 0) > 0) {
+      if (finance.hasPending) reasons.push('finance approval is still pending');
+      else if (!finance.hasApproved) reasons.push('the event budget has not been approved');
+    }
     return `Planning status is automatic. ${reasons.length ? reasons.join('; ') : 'Preparation requirements are not yet complete'}.`;
   }
   if (lifecycle === 'Event Day') {

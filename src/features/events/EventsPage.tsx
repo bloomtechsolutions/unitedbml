@@ -3,11 +3,14 @@
 import { useMemo, useState } from 'react';
 import { useToast } from '../../lib/ToastContext';
 import type { EventRow } from '../../types/database';
+import { useEventFinanceSummary } from '../finance/useFinance';
 import { EventDetailModal } from './EventDetailModal';
 import { EventFormModal } from './EventFormModal';
-import { eventLifecycle, eventPreparationProgress, eventReadiness } from './lifecycle';
+import { eventLifecycle, eventPreparationProgress, eventReadiness, type FinanceStatus } from './lifecycle';
 import type { EventWithChildren } from './types';
 import { createEvent, deleteEvent, updateEvent, useCommitteeMembers, useEventTypes, useEvents } from './useEvents';
+
+const NO_FINANCE: FinanceStatus = { hasApproved: false, hasPending: false };
 
 type SubTab = 'overview' | 'assignments' | 'attendance' | 'archive';
 
@@ -15,6 +18,7 @@ export function EventsPage() {
   const { events, loading, error, reload } = useEvents();
   const eventTypes = useEventTypes();
   const coordinators = useCommitteeMembers();
+  const { statusByEvent: financeByEvent } = useEventFinanceSummary();
   const toast = useToast();
 
   const [subTab, setSubTab] = useState<SubTab>('overview');
@@ -28,13 +32,16 @@ export function EventsPage() {
 
   const enriched = useMemo(
     () =>
-      events.map((event) => ({
-        event,
-        lifecycle: eventLifecycle(event, event.tasks),
-        readiness: eventReadiness(event, event.tasks),
-        prep: eventPreparationProgress(event.tasks),
-      })),
-    [events]
+      events.map((event) => {
+        const finance = financeByEvent.get(event.id) ?? NO_FINANCE;
+        return {
+          event,
+          lifecycle: eventLifecycle(event, event.tasks, finance),
+          readiness: eventReadiness(event, event.tasks, finance),
+          prep: eventPreparationProgress(event.tasks),
+        };
+      }),
+    [events, financeByEvent]
   );
 
   const active = enriched.filter((e) => !e.event.archived);

@@ -252,6 +252,112 @@ export interface MeetingActionHistoryRow {
   data: Record<string, unknown>;
 }
 
+export interface BudgetRow {
+  id: string;
+  budget_year: number;
+  category: string;
+  approved_amount: number;
+  notes: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface ExpenseRequestRow {
+  id: string;
+  request_number: string | null;
+  title: string | null;
+  event_id: string | null;
+  event_name: string | null;
+  request_date: string | null;
+  category: string | null;
+  purpose: string | null;
+  requested_by: string | null;
+  requester_role: string | null;
+  requested_by_user: string | null;
+  prepared_by_name: string | null;
+  prepared_by_role: string | null;
+  prepared_at: string | null;
+  submitted_at: string | null;
+  status: string;
+  subtotal: number;
+  contingency_percent: number;
+  contingency_amount: number;
+  total_amount: number;
+  president_availability: string | null;
+  president_recommendation: string | null;
+  president_comment: string | null;
+  recommended_by_name: string | null;
+  recommended_by_role: string | null;
+  final_approver_name: string | null;
+  final_approver_role: string | null;
+  final_approver_email: string | null;
+  final_approver_comment: string | null;
+  approved_by_name: string | null;
+  approved_by_role: string | null;
+  approved_at: string | null;
+  planned_event_budget: number;
+  previous_approved_event_spend: number;
+  projected_event_spend: number;
+  over_budget: boolean;
+  overrun_amount: number;
+  overrun_justification: string | null;
+  budget_available_before_approval: number | null;
+  budget_available_after_approval: number | null;
+  reversal_status: string | null;
+  reversal_reason: string | null;
+  reversal_requested_by: string | null;
+  reversal_requested_at: string | null;
+  reversal_president_comment: string | null;
+  reversed_by: string | null;
+  reversed_at: string | null;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseLineRow {
+  id: string;
+  expense_request_id: string;
+  line_no: number;
+  description: string;
+  quantity: number;
+  rate: number;
+  line_total: number;
+  vendor_number: string | null;
+  vendor: string | null;
+  reimbursement_required: boolean;
+  data: Record<string, unknown>;
+}
+
+export interface ExpenseApprovalRow {
+  id: string;
+  expense_request_id: string;
+  stage: string;
+  decision: string;
+  approver_name: string | null;
+  approver_role: string | null;
+  approver_user: string | null;
+  comment: string | null;
+  channel: string | null;
+  decided_at: string;
+  data: Record<string, unknown>;
+}
+
+export interface ExpenseReversalRow {
+  id: string;
+  expense_request_id: string;
+  requested_by: string | null;
+  requested_by_name: string | null;
+  reason: string;
+  status: string;
+  president_comment: string | null;
+  decided_by: string | null;
+  decided_by_name: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  data: Record<string, unknown>;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -288,6 +394,23 @@ export interface Database {
         Row: MeetingActionHistoryRow;
         Insert: Partial<MeetingActionHistoryRow>;
         Update: Partial<MeetingActionHistoryRow>;
+      };
+      budgets: { Row: BudgetRow; Insert: Partial<BudgetRow>; Update: Partial<BudgetRow> };
+      expense_requests: {
+        Row: ExpenseRequestRow;
+        Insert: Partial<ExpenseRequestRow>;
+        Update: Partial<ExpenseRequestRow>;
+      };
+      expense_lines: { Row: ExpenseLineRow; Insert: Partial<ExpenseLineRow>; Update: Partial<ExpenseLineRow> };
+      expense_approvals: {
+        Row: ExpenseApprovalRow;
+        Insert: Partial<ExpenseApprovalRow>;
+        Update: Partial<ExpenseApprovalRow>;
+      };
+      expense_reversals: {
+        Row: ExpenseReversalRow;
+        Insert: Partial<ExpenseReversalRow>;
+        Update: Partial<ExpenseReversalRow>;
       };
     };
   };
