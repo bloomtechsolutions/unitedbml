@@ -23,6 +23,14 @@ import {
 
 type SubTab = 'meetings' | 'actions' | 'decisions';
 
+const STATUS_PILL: Record<MeetingStatus, string> = {
+  Scheduled: 'ub-pill-warning',
+  'In Progress': 'ub-pill-accent',
+  'Minutes Pending': 'ub-pill-gold',
+  Completed: 'ub-pill-success',
+  Cancelled: 'ub-pill-neutral',
+};
+
 export function MeetingsPage() {
   const { isCommitteeUser } = useAuth();
   const { meetings, loading, error, reload } = useMeetings();
@@ -101,72 +109,78 @@ export function MeetingsPage() {
   };
 
   if (loading) return <div>Loading meetings…</div>;
-  if (error) return <div style={{ color: 'var(--danger)' }}>Failed to load meetings: {error}</div>;
+  if (error) return <div style={{ color: 'var(--ub-danger)' }}>Failed to load meetings: {error}</div>;
 
   return (
     <div>
-      <div className="meeting-hero">
+      <div className="ub-page-head">
         <div>
-          <h2>Meetings</h2>
-          <p>Schedule meetings, run agendas, and track decisions and follow-up actions.</p>
+          <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+            Governance
+          </div>
+          <h1 style={{ fontSize: 26, fontWeight: 700 }}>Meetings</h1>
+          <p>Agendas, decisions, and actions — with a straight line from an agenda item to a scheduled event.</p>
         </div>
         {isCommitteeUser && (
           <button
-            className="btn primary"
+            className="ub-btn ub-btn-primary"
             onClick={() => {
               setEditingMeeting(null);
               setFormOpen(true);
             }}
           >
-            + Schedule Meeting
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
+            Schedule Meeting
           </button>
         )}
       </div>
 
-      <div className="meeting-kpis">
-        <div className="kpi">
-          <div className="lbl">Upcoming</div>
-          <strong>{kpis.upcoming}</strong>
+      <div className="ub-kpi-row">
+        <div className="ub-card ub-kpi">
+          <div className="ub-kpi-value">{kpis.upcoming}</div>
+          <div className="ub-kpi-label">Upcoming</div>
         </div>
-        <div className="kpi">
-          <div className="lbl">This Month</div>
-          <strong>{kpis.thisMonth}</strong>
+        <div className="ub-card ub-kpi">
+          <div className="ub-kpi-value">{kpis.thisMonth}</div>
+          <div className="ub-kpi-label">This Month</div>
         </div>
-        <div className="kpi">
-          <div className="lbl">Open Actions</div>
-          <strong>{kpis.openActions}</strong>
+        <div className="ub-card ub-kpi">
+          <div className="ub-kpi-value">{kpis.openActions}</div>
+          <div className="ub-kpi-label">Open Actions</div>
         </div>
-        <div className="kpi">
-          <div className="lbl">Overdue Actions</div>
-          <strong>{kpis.overdueActions}</strong>
+        <div className="ub-card ub-kpi">
+          <div className="ub-kpi-value" style={{ color: kpis.overdueActions ? 'var(--ub-danger-dark)' : undefined }}>{kpis.overdueActions}</div>
+          <div className="ub-kpi-label">Overdue Actions</div>
         </div>
-        <div className="kpi">
-          <div className="lbl">Minutes Pending</div>
-          <strong>{kpis.pendingMinutes}</strong>
+        <div className="ub-card ub-kpi">
+          <div className="ub-kpi-value">{kpis.pendingMinutes}</div>
+          <div className="ub-kpi-label">Minutes Pending</div>
         </div>
-        <div className="kpi">
-          <div className="lbl">Pending Event Creation</div>
-          <strong>{kpis.pendingEventCreation}</strong>
+        <div className="ub-card ub-kpi">
+          <div className="ub-kpi-value" style={{ color: kpis.pendingEventCreation ? 'var(--ub-accent-dark)' : undefined }}>{kpis.pendingEventCreation}</div>
+          <div className="ub-kpi-label">Pending Event Creation</div>
         </div>
       </div>
 
-      <div className="tabs">
-        <button className={`tab ${subTab === 'meetings' ? 'active' : ''}`} onClick={() => setSubTab('meetings')}>
+      <div className="ub-tabs">
+        <button className={`ub-tab ${subTab === 'meetings' ? 'active' : ''}`} onClick={() => setSubTab('meetings')}>
           Meetings
         </button>
-        <button className={`tab ${subTab === 'actions' ? 'active' : ''}`} onClick={() => setSubTab('actions')}>
+        <button className={`ub-tab ${subTab === 'actions' ? 'active' : ''}`} onClick={() => setSubTab('actions')}>
           Action Follow-up
         </button>
-        <button className={`tab ${subTab === 'decisions' ? 'active' : ''}`} onClick={() => setSubTab('decisions')}>
+        <button className={`ub-tab ${subTab === 'decisions' ? 'active' : ''}`} onClick={() => setSubTab('decisions')}>
           Decision Register
         </button>
       </div>
 
       {subTab === 'meetings' && (
         <>
-          <div className="toolbar">
-            <div className="filters">
+          <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+            <div className="ub-field" style={{ width: 280 }}>
               <input placeholder="Search meetings…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="ub-field" style={{ width: 200 }}>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as MeetingStatus | '')}>
                 <option value="">All statuses</option>
                 {MEETING_STATUSES.map((s) => (
@@ -177,25 +191,30 @@ export function MeetingsPage() {
               </select>
             </div>
           </div>
-          <div className="meeting-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
             {filtered.map(({ meeting, status }) => (
-              <div key={meeting.id} className="meeting-card" onClick={() => setWorkspaceId(meeting.id)}>
-                <span className={`meeting-status ${status.replace(/\s/g, '')}`}>{status}</span>
-                <h3>{meeting.title}</h3>
-                <div className="meta">
-                  <span>{meeting.meeting_date}</span>
-                  <span>{meeting.meeting_time}</span>
-                  <span>{meeting.location}</span>
+              <div
+                key={meeting.id}
+                className="ub-card"
+                style={{ cursor: 'pointer', padding: 20 }}
+                onClick={() => setWorkspaceId(meeting.id)}
+              >
+                <span className={`ub-pill ${STATUS_PILL[status]}`}>{status}</span>
+                <h3 style={{ fontSize: 16.5, fontWeight: 700, margin: '10px 0 8px' }}>{meeting.title}</h3>
+                <div style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', lineHeight: 1.7 }}>
+                  {meeting.meeting_date} · {meeting.meeting_time}
+                  <br />
+                  {meeting.location}
                 </div>
               </div>
             ))}
-            {!filtered.length && <div style={{ color: 'var(--muted)' }}>No meetings match your filters.</div>}
+            {!filtered.length && <div className="ub-empty">No meetings match your filters.</div>}
           </div>
         </>
       )}
 
       {subTab === 'actions' && (
-        <table className="table">
+        <table className="ub-table">
           <thead>
             <tr>
               <th>Action</th>
@@ -215,20 +234,23 @@ export function MeetingsPage() {
                 return (a.action.due_date || '').localeCompare(b.action.due_date || '');
               })
               .map(({ meeting, action }) => (
-                <tr key={action.id} className={isOverdue(action.due_date, action.status) ? 'action-overdue' : isDueToday(action.due_date, action.status) ? 'action-due' : ''}>
+                <tr
+                  key={action.id}
+                  className={isOverdue(action.due_date, action.status) ? 'ub-row-overdue' : isDueToday(action.due_date, action.status) ? 'ub-row-due' : ''}
+                >
                   <td>
                     {action.action_text}
-                    {action.remarks && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{action.remarks}</div>}
+                    {action.remarks && <div style={{ fontSize: 11, color: 'var(--ub-ink-faint)' }}>{action.remarks}</div>}
                   </td>
                   <td>
-                    <button className="btn ghost" onClick={() => setWorkspaceId(meeting.id)}>
+                    <button className="ub-btn ub-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => setWorkspaceId(meeting.id)}>
                       {meeting.title}
                     </button>
                   </td>
                   <td>{action.assigned_to || '—'}</td>
                   <td>
                     {action.due_date || '—'}{' '}
-                    {isOverdue(action.due_date, action.status) && <span className="pill cancel">Overdue</span>}
+                    {isOverdue(action.due_date, action.status) && <span className="ub-pill ub-pill-danger">Overdue</span>}
                   </td>
                   <td>{action.event_id ? 'Linked' : '—'}</td>
                   <td>
@@ -244,7 +266,7 @@ export function MeetingsPage() {
               ))}
             {!allActions.length && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                <td colSpan={6} className="ub-empty">
                   No action items recorded yet.
                 </td>
               </tr>
@@ -254,7 +276,7 @@ export function MeetingsPage() {
       )}
 
       {subTab === 'decisions' && (
-        <table className="table">
+        <table className="ub-table">
           <thead>
             <tr>
               <th>Date</th>
@@ -269,20 +291,20 @@ export function MeetingsPage() {
               <tr key={decision.id}>
                 <td>{meeting.meeting_date}</td>
                 <td>
-                  <button className="btn ghost" onClick={() => setWorkspaceId(meeting.id)}>
+                  <button className="ub-btn ub-btn-ghost" style={{ padding: '6px 12px' }} onClick={() => setWorkspaceId(meeting.id)}>
                     {meeting.title}
                   </button>
                 </td>
                 <td>{decision.decision_text}</td>
                 <td>
-                  <span className={`pill ${decision.outcome === 'Approved' ? 'done' : 'plan'}`}>{decision.outcome}</span>
+                  <span className={`ub-pill ${decision.outcome === 'Approved' ? 'ub-pill-success' : 'ub-pill-accent'}`}>{decision.outcome}</span>
                 </td>
                 <td>{decision.owner || '—'}</td>
               </tr>
             ))}
             {!allDecisions.length && (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                <td colSpan={5} className="ub-empty">
                   No decisions recorded yet.
                 </td>
               </tr>

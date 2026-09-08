@@ -11,7 +11,7 @@ import { DecisionFormModal } from './DecisionFormModal';
 import { buildMinutesHtml, printMeetingMinutes } from './minutes';
 import { isDueToday, isOverdue, meetingStatus } from './status';
 import { ATTENDANCE_STATUSES } from './types';
-import type { MeetingWithChildren } from './types';
+import type { MeetingStatus, MeetingWithChildren } from './types';
 import {
   createEventFromAgendaItem,
   deleteAction,
@@ -26,6 +26,14 @@ import {
 } from './useMeetings';
 
 type Tab = 'overview' | 'agenda' | 'attendance' | 'decisions' | 'actions' | 'minutes';
+
+const STATUS_PILL: Record<MeetingStatus, string> = {
+  Scheduled: 'ub-pill-warning',
+  'In Progress': 'ub-pill-accent',
+  'Minutes Pending': 'ub-pill-gold',
+  Completed: 'ub-pill-success',
+  Cancelled: 'ub-pill-neutral',
+};
 
 interface Props {
   meeting: MeetingWithChildren | null;
@@ -133,20 +141,17 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
 
   return (
     <Modal open onClose={onClose} title={meeting.title} wide>
-      <div className="meeting-workspace-head">
-        <span className={`meeting-status ${status.replace(/\s/g, '')}`}>{status}</span>
-        <h2 style={{ marginTop: 8 }}>{meeting.title}</h2>
-        <div className="meta">
-          <span>{meeting.meeting_date}</span>
-          <span>{meeting.meeting_time}</span>
-          <span>{meeting.location}</span>
-          <span>Chair: {meeting.chair || '—'}</span>
+      <div style={{ marginBottom: 18 }}>
+        <span className={`ub-pill ${STATUS_PILL[status]}`}>{status}</span>
+        <h2 style={{ fontSize: 19, fontWeight: 700, marginTop: 8 }}>{meeting.title}</h2>
+        <div style={{ fontSize: 12.5, color: 'var(--ub-ink-soft)', marginTop: 4 }}>
+          {meeting.meeting_date} · {meeting.meeting_time} · {meeting.location} · Chair: {meeting.chair || '—'}
         </div>
       </div>
 
-      <div className="tabs">
+      <div className="ub-tabs">
         {(['overview', 'agenda', 'attendance', 'decisions', 'actions', 'minutes'] as Tab[]).map((t) => (
-          <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+          <button key={t} className={`ub-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
@@ -154,34 +159,34 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
 
       {tab === 'overview' && (
         <div>
-          <div className="meeting-stat-grid">
-            <div className="meeting-stat">
-              <small>Agenda Items</small>
-              <strong>{meeting.agenda.length}</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
+            <div className="ub-card ub-kpi">
+              <div className="ub-kpi-value">{meeting.agenda.length}</div>
+              <div className="ub-kpi-label">Agenda Items</div>
             </div>
-            <div className="meeting-stat">
-              <small>Open Actions</small>
-              <strong>{openActions.length}</strong>
+            <div className="ub-card ub-kpi">
+              <div className="ub-kpi-value">{openActions.length}</div>
+              <div className="ub-kpi-label">Open Actions</div>
             </div>
-            <div className="meeting-stat">
-              <small>Overdue Actions</small>
-              <strong>{overdueActions.length}</strong>
+            <div className="ub-card ub-kpi">
+              <div className="ub-kpi-value" style={{ color: overdueActions.length ? 'var(--ub-danger-dark)' : undefined }}>{overdueActions.length}</div>
+              <div className="ub-kpi-label">Overdue Actions</div>
             </div>
-            <div className="meeting-stat">
-              <small>Decisions</small>
-              <strong>{meeting.decisions.length}</strong>
+            <div className="ub-card ub-kpi">
+              <div className="ub-kpi-value">{meeting.decisions.length}</div>
+              <div className="ub-kpi-label">Decisions</div>
             </div>
           </div>
-          <p style={{ marginTop: 16 }}>{meeting.purpose}</p>
+          <p style={{ marginTop: 18, fontSize: 13.5, color: 'var(--ub-ink-soft)', lineHeight: 1.6 }}>{meeting.purpose}</p>
           <div className="modal-actions">
-            <button className="btn ghost" onClick={() => onEdit(meeting)}>
+            <button className="ub-btn ub-btn-ghost" onClick={() => onEdit(meeting)}>
               Edit Meeting
             </button>
-            <button className="btn ghost" onClick={() => void handleToggleMinutes()}>
+            <button className="ub-btn ub-btn-ghost" onClick={() => void handleToggleMinutes()}>
               {meeting.minutes_finalized ? 'Reopen Minutes' : 'Finalize Minutes'}
             </button>
             {!meeting.cancelled && (
-              <button className="btn danger" onClick={() => onCancel(meeting)}>
+              <button className="ub-btn ub-btn-danger" onClick={() => onCancel(meeting)}>
                 Cancel Meeting
               </button>
             )}
@@ -191,10 +196,9 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
 
       {tab === 'agenda' && (
         <div>
-          <div className="toolbar">
-            <div />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
             <button
-              className="btn primary"
+              className="ub-btn ub-btn-primary"
               onClick={() => {
                 setEditingAgenda(null);
                 setAgendaModalOpen(true);
@@ -203,27 +207,28 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
               + Add Agenda Item
             </button>
           </div>
-          {meeting.agenda.map((item) => (
-            <div key={item.id} className="committee-detail-row" style={{ gridTemplateColumns: '1fr', borderTop: '1px dashed #e7ebf2', padding: '10px 0' }}>
-              <div>
-                <b>{item.title}</b>{' '}
-                {item.carry_forward && <span className="meeting-link">Needs Discussion</span>}
-                {item.owner && <span className="meeting-link">{item.owner}</span>}
-                {item.outcome && <span className="meeting-link">{item.outcome}</span>}
-                {item.outcome === 'Create Event / Activity' && !item.created_event_id && (
-                  <span className="meeting-link" style={{ background: '#fff4db', color: '#946000' }}>
-                    Pending Event Creation
-                  </span>
-                )}
-                {item.created_event_id && (
-                  <span className="meeting-link" style={{ background: '#eafaf2', color: '#17825a' }}>
-                    Event Created ✓
-                  </span>
-                )}
-                {item.discussion && <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0' }}>{item.discussion}</p>}
-                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {meeting.agenda.map((item) => (
+              <div key={item.id} className="ub-card" style={{ padding: '16px 18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 14.5, fontWeight: 700 }}>{item.title}</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      {item.carry_forward && <span className="ub-pill ub-pill-warning">Needs Discussion</span>}
+                      {item.owner && <span className="ub-pill ub-pill-neutral">{item.owner}</span>}
+                      {item.outcome && <span className="ub-pill ub-pill-neutral">{item.outcome}</span>}
+                      {item.outcome === 'Create Event / Activity' && !item.created_event_id && (
+                        <span className="ub-pill ub-pill-warning">Pending Event Creation</span>
+                      )}
+                      {item.created_event_id && <span className="ub-pill ub-pill-success">Event Created ✓</span>}
+                    </div>
+                    {item.discussion && <p style={{ fontSize: 12.5, color: 'var(--ub-ink-soft)', margin: '10px 0 0', lineHeight: 1.5 }}>{item.discussion}</p>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                   <button
-                    className="btn ghost"
+                    className="ub-btn ub-btn-ghost"
+                    style={{ padding: '7px 14px', fontSize: 12.5 }}
                     onClick={() => {
                       setEditingAgenda(item);
                       setAgendaModalOpen(true);
@@ -232,31 +237,36 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                     Edit
                   </button>
                   {item.outcome === 'Create Event / Activity' && !item.created_event_id && (
-                    <button className="btn soft" onClick={() => void handleCreateEvent(item)}>
-                      + Create Event
+                    <button
+                      className="ub-btn"
+                      style={{ padding: '7px 14px', fontSize: 12.5, background: 'var(--ub-accent-soft)', color: 'var(--ub-accent-dark)' }}
+                      onClick={() => void handleCreateEvent(item)}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ub-accent-dark)" strokeWidth="2.4"><path d="M12 5v14M5 12h14" /></svg>
+                      Create Event
                     </button>
                   )}
-                  <button className="btn danger" onClick={() => void handleDeleteAgenda(item)}>
+                  <button className="ub-btn ub-btn-danger" style={{ padding: '7px 14px', fontSize: 12.5 }} onClick={() => void handleDeleteAgenda(item)}>
                     Delete
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
-          {!meeting.agenda.length && <p style={{ color: 'var(--muted)' }}>No agenda items yet.</p>}
+            ))}
+            {!meeting.agenda.length && <p className="ub-empty">No agenda items yet.</p>}
+          </div>
         </div>
       )}
 
       {tab === 'attendance' && (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {meeting.attendees.map((attendee) => (
-            <div key={attendee.id} className="meeting-attendance-row">
+            <div key={attendee.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 4px', borderBottom: '1px solid var(--ub-border)' }}>
               <div>
-                <b>{attendee.attendee_name}</b>
-                <small style={{ display: 'block', color: 'var(--muted)' }}>{attendee.attendee_role}</small>
+                <b style={{ fontSize: 13.5 }}>{attendee.attendee_name}</b>
+                <small style={{ display: 'block', color: 'var(--ub-ink-faint)', marginTop: 2 }}>{attendee.attendee_role}</small>
               </div>
-              <div className="meeting-attendance-control">
-                <span className={`meeting-attendance-state ${attendee.attendance_status}`}>{attendee.attendance_status}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="ub-pill ub-pill-neutral">{attendee.attendance_status}</span>
                 <select
                   value={attendee.attendance_status ?? 'Expected'}
                   onChange={(e) => void handleAttendance(attendee.id, e.target.value)}
@@ -270,19 +280,18 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
               </div>
             </div>
           ))}
-          {!meeting.attendees.length && <p style={{ color: 'var(--muted)' }}>No attendees seated yet.</p>}
+          {!meeting.attendees.length && <p className="ub-empty">No attendees seated yet.</p>}
         </div>
       )}
 
       {tab === 'decisions' && (
         <div>
-          <div className="toolbar">
-            <div />
-            <button className="btn primary" onClick={() => setDecisionModalOpen(true)}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+            <button className="ub-btn ub-btn-primary" onClick={() => setDecisionModalOpen(true)}>
               + Record Decision
             </button>
           </div>
-          <table className="table">
+          <table className="ub-table">
             <thead>
               <tr>
                 <th>Decision</th>
@@ -296,11 +305,11 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                 <tr key={d.id}>
                   <td>{d.decision_text}</td>
                   <td>
-                    <span className={`pill ${d.outcome === 'Approved' ? 'done' : 'plan'}`}>{d.outcome}</span>
+                    <span className={`ub-pill ${d.outcome === 'Approved' ? 'ub-pill-success' : 'ub-pill-accent'}`}>{d.outcome}</span>
                   </td>
                   <td>{d.owner || '—'}</td>
                   <td>
-                    <button className="btn danger" onClick={() => void handleDeleteDecision(d)}>
+                    <button className="ub-btn ub-btn-danger" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => void handleDeleteDecision(d)}>
                       Delete
                     </button>
                   </td>
@@ -308,7 +317,7 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
               ))}
               {!meeting.decisions.length && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                  <td colSpan={4} className="ub-empty">
                     No decisions recorded.
                   </td>
                 </tr>
@@ -320,10 +329,9 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
 
       {tab === 'actions' && (
         <div>
-          <div className="toolbar">
-            <div />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
             <button
-              className="btn primary"
+              className="ub-btn ub-btn-primary"
               onClick={() => {
                 setEditingAction(null);
                 setActionModalOpen(true);
@@ -332,7 +340,7 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
               + Add Action
             </button>
           </div>
-          <table className="table">
+          <table className="ub-table">
             <thead>
               <tr>
                 <th>Action</th>
@@ -346,12 +354,12 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
               {meeting.actions.map((a) => (
                 <tr
                   key={a.id}
-                  className={isOverdue(a.due_date, a.status) ? 'action-overdue' : isDueToday(a.due_date, a.status) ? 'action-due' : ''}
+                  className={isOverdue(a.due_date, a.status) ? 'ub-row-overdue' : isDueToday(a.due_date, a.status) ? 'ub-row-due' : ''}
                 >
                   <td>{a.action_text}</td>
                   <td>{a.assigned_to || '—'}</td>
                   <td>
-                    {a.due_date || '—'} {isOverdue(a.due_date, a.status) && <span className="pill cancel">Overdue</span>}
+                    {a.due_date || '—'} {isOverdue(a.due_date, a.status) && <span className="ub-pill ub-pill-danger">Overdue</span>}
                   </td>
                   <td>
                     <select value={a.status} onChange={(e) => void handleQuickStatus(a, e.target.value)}>
@@ -362,9 +370,10 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                       ))}
                     </select>
                   </td>
-                  <td className="task-actions">
+                  <td style={{ display: 'flex', gap: 6 }}>
                     <button
-                      className="btn ghost"
+                      className="ub-btn ub-btn-ghost"
+                      style={{ padding: '6px 12px', fontSize: 12 }}
                       onClick={() => {
                         setEditingAction(a);
                         setActionModalOpen(true);
@@ -372,7 +381,7 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                     >
                       Edit
                     </button>
-                    <button className="btn danger" onClick={() => void handleDeleteAction(a)}>
+                    <button className="ub-btn ub-btn-danger" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => void handleDeleteAction(a)}>
                       Delete
                     </button>
                   </td>
@@ -380,7 +389,7 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
               ))}
               {!meeting.actions.length && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                  <td colSpan={5} className="ub-empty">
                     No action items yet.
                   </td>
                 </tr>
@@ -392,9 +401,8 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
 
       {tab === 'minutes' && (
         <div>
-          <div className="toolbar">
-            <div />
-            <button className="btn primary" onClick={() => printMeetingMinutes(meeting)}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+            <button className="ub-btn ub-btn-primary" onClick={() => printMeetingMinutes(meeting)}>
               Print / Export
             </button>
           </div>
