@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
+import { ContingencyPanel } from '../settlements/ContingencyPanel';
+import { SettlementModal } from '../settlements/SettlementModal';
+import { useSettlementRegister } from '../settlements/useSettlements';
 import { RequestDetailModal } from './RequestDetailModal';
 import { RequestFormModal } from './RequestFormModal';
 import type { ExpenseRequestWithLines } from './types';
@@ -18,7 +21,7 @@ import {
   useReversals,
 } from './useFinance';
 
-type SubTab = 'requests' | 'approvals' | 'reversals';
+type SubTab = 'requests' | 'approvals' | 'reversals' | 'settlements' | 'contingency';
 
 export function FinancePage() {
   const { budget, loading: budgetLoading, reload: reloadBudget } = useBudget();
@@ -34,7 +37,10 @@ export function FinancePage() {
   const [formOpen, setFormOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [busyReversalId, setBusyReversalId] = useState<string | null>(null);
+  const [settlementKey, setSettlementKey] = useState<string | null>(null);
+  const [settlementStatusFilter, setSettlementStatusFilter] = useState('');
   const searchParams = useSearchParams();
+  const { rows: settlementRows, loading: settlementsLoading, reload: reloadSettlements } = useSettlementRegister();
 
   useEffect(() => {
     if (searchParams.get('new') === '1') setFormOpen(true);
@@ -135,6 +141,12 @@ export function FinancePage() {
         </button>
         <button className={`tab ${subTab === 'reversals' ? 'active' : ''}`} onClick={() => setSubTab('reversals')}>
           Reversals ({reversals.length})
+        </button>
+        <button className={`tab ${subTab === 'settlements' ? 'active' : ''}`} onClick={() => setSubTab('settlements')}>
+          Settlements
+        </button>
+        <button className={`tab ${subTab === 'contingency' ? 'active' : ''}`} onClick={() => setSubTab('contingency')}>
+          Contingency
         </button>
       </div>
 
@@ -279,12 +291,82 @@ export function FinancePage() {
         </table>
       )}
 
+      {subTab === 'settlements' && (
+        <>
+          <div className="toolbar">
+            <div className="filters">
+              <select value={settlementStatusFilter} onChange={(e) => setSettlementStatusFilter(e.target.value)}>
+                <option value="">All Statuses</option>
+                <option value="Pending Actuals">Pending Actuals</option>
+                <option value="Actuals Entered">Actuals Entered</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+          </div>
+          {settlementsLoading && <div>Loading settlements…</div>}
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Scope</th>
+                <th>Approved</th>
+                <th>Actual</th>
+                <th>Variance</th>
+                <th>Contingency Released</th>
+                <th>Status</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {settlementRows
+                .filter((r) => !settlementStatusFilter || r.status === settlementStatusFilter)
+                .map((r) => (
+                  <tr key={r.key}>
+                    <td>
+                      {r.reference}
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>{r.title}</div>
+                    </td>
+                    <td>
+                      <span className="pill plan">{r.isGeneral ? 'General Expense' : 'Event-linked'}</span>
+                      {r.pendingContingency > 0 && (
+                        <div style={{ fontSize: 10.5, color: 'var(--danger)' }}>{r.pendingContingency} contingency pending</div>
+                      )}
+                    </td>
+                    <td>{r.approved.toLocaleString()}</td>
+                    <td>{r.actual.toLocaleString()}</td>
+                    <td style={{ color: r.actual > r.approved ? 'var(--danger)' : undefined }}>{(r.approved - r.actual).toLocaleString()}</td>
+                    <td>{r.contingencyReleased ? r.contingencyReleased.toLocaleString() : '—'}</td>
+                    <td>
+                      <span className="pill plan">{r.status}</span>
+                    </td>
+                    <td>
+                      <button className="btn ghost" onClick={() => setSettlementKey(r.key)}>
+                        Open Settlement
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              {!settlementsLoading && !settlementRows.length && (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                    No approved expenses awaiting settlement.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {subTab === 'contingency' && <ContingencyPanel />}
+
       <RequestFormModal open={formOpen} onClose={() => setFormOpen(false)} onCreated={refreshAll} />
       <RequestDetailModal
         request={detail as ExpenseRequestWithLines | null}
         onClose={() => setDetailId(null)}
         onRefresh={refreshAll}
       />
+      <SettlementModal settlementKey={settlementKey} onClose={() => setSettlementKey(null)} onChanged={reloadSettlements} />
     </div>
   );
 }

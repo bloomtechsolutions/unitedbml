@@ -320,7 +320,78 @@ export interface ExpenseRequestRow {
   reversal_president_comment: string | null;
   reversed_by: string | null;
   reversed_at: string | null;
+  actual_expense_total: number;
+  actual_expense_remarks: string | null;
+  actual_entered_by: string | null;
+  actual_entered_at: string | null;
+  finance_settlement_status: string;
+  finance_closed_at: string | null;
   data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventActualExpenseRow {
+  id: string;
+  event_id: string | null;
+  settlement_key: string;
+  line_type: string;
+  source_key: string;
+  expense_item: string;
+  approved_amount: number;
+  actual_amount: number;
+  variance_amount: number;
+  vendor_number: string | null;
+  vendor_name: string | null;
+  reference: string | null;
+  entered_by: string | null;
+  source_type: string | null;
+  expense_request_id: string | null;
+  expense_line_no: number | null;
+  reimbursement_reference: string | null;
+  ap_status: string | null;
+  is_reimbursement: boolean;
+  manual_entered: boolean;
+  data: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ContingencyRequestRow {
+  id: string;
+  ref: string;
+  event_id: string | null;
+  event_name: string | null;
+  expense_request_id: string;
+  expense_request_number: string | null;
+  line_index: number;
+  expense_item: string;
+  original_approved_amount: number;
+  contingency_available_at_request: number;
+  requested_amount: number;
+  reason: string;
+  status: string;
+  requested_by: string | null;
+  requested_by_name: string | null;
+  requested_by_role: string | null;
+  requested_by_email: string | null;
+  requested_at: string;
+  president_recommendation: string | null;
+  president_by: string | null;
+  president_at: string | null;
+  procurement_to: string | null;
+  procurement_subject: string | null;
+  procurement_email_sent_at: string | null;
+  procurement_decision: string | null;
+  procurement_response_date: string | null;
+  procurement_response_by: string | null;
+  procurement_response_attachment_path: string | null;
+  procurement_response_attachment_name: string | null;
+  procurement_response_attachment_type: string | null;
+  procurement_response_attachment_size: number;
+  released_amount: number;
+  released_at: string | null;
+  released_by: string | null;
+  history: { at: string; status: string; note?: string }[];
   created_at: string;
   updated_at: string;
 }
