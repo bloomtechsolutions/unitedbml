@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../lib/AuthContext';
+import { useToast } from '../../lib/ToastContext';
 import type { PortalEvent } from './types';
 import { decideEventTeamJoin, sendEventTeamMessage, useEventTeamMessages } from './usePortal';
 
@@ -15,6 +16,7 @@ interface Props {
 
 export function TeamDetailModal({ event, teamId, onClose, onChanged }: Props) {
   const { profile } = useAuth();
+  const toast = useToast();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const team = event?.teams.find((t) => t.id === teamId) ?? null;
@@ -26,6 +28,14 @@ export function TeamDetailModal({ event, teamId, onClose, onChanged }: Props) {
   const isLeader = team.leader_user_id === profile?.id;
   const isMember = members.some((m) => m.user_id === profile?.id && m.status === 'Approved');
   const pending = members.filter((m) => m.status === 'Pending Leader Approval');
+
+  const copyJoinLink = () => {
+    const link = `${window.location.origin}/portal?team=${team.id}`;
+    navigator.clipboard
+      .writeText(link)
+      .then(() => toast('Join link copied — share it with people you want on this team'))
+      .catch(() => toast(link));
+  };
 
   const decide = async (registrationId: string, approve: boolean) => {
     setBusy(true);
@@ -57,6 +67,14 @@ export function TeamDetailModal({ event, teamId, onClose, onChanged }: Props) {
 
   return (
     <Modal open={Boolean(team)} onClose={onClose} title={team.team_name}>
+      {isLeader && (
+        <div className="modal-actions" style={{ justifyContent: 'flex-start', marginTop: 0 }}>
+          <button className="btn ghost" onClick={copyJoinLink}>
+            Copy Join Link
+          </button>
+        </div>
+      )}
+
       <div className="portal-team-members">
         <h4>Roster</h4>
         {members

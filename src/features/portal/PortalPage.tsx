@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { EventPortalSettingsModal } from './EventPortalSettingsModal';
@@ -10,6 +11,7 @@ import type { PortalEvent } from './types';
 import {
   computeEngagement,
   createEventTeam,
+  decideEventTeamJoin,
   requestJoinEventTeam,
   selfRegisterEvent,
   useEventAttendanceAll,
@@ -19,7 +21,7 @@ import {
   usePortalEvents,
 } from './usePortal';
 
-type SubTab = 'hub' | 'activities' | 'registrations' | 'engagement' | 'reimbursements';
+type SubTab = 'hub' | 'activities' | 'registrations' | 'engagement' | 'reimbursements' | 'team-requests';
 
 function registrationStatusText(event: PortalEvent): string {
   if (!event.registration_enabled) return 'Registration not open';
@@ -43,13 +45,63 @@ export function PortalPage() {
   const [settingsTarget, setSettingsTarget] = useState<PortalEvent | null>(null);
   const [reimbModalOpen, setReimbModalOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState<Record<string, string>>({});
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  const searchParams = useSearchParams();
 
   const registrable = events.filter((e) => e.registration_enabled);
   const myRegistrations = events.filter((e) => e.myRegistration);
   const engagement = computeEngagement(profile, events, attendance);
 
+  const pendingTeamJoins = events.flatMap((e) =>
+    e.registrations.filter((r) => r.status === 'Pending Leader Approval').map((r) => ({ event: e, registration: r }))
+  );
+
   const refresh = async () => {
     await reload();
+  };
+
+  // QR / deep-link team join: a shared link like /portal?team=<teamId> (optionally with
+  // ?event=<eventId>) auto-processes the join request the moment the portal loads, then opens
+  // the team so the member can see it was sent.
+  useEffect(() => {
+    if (deepLinkHandled || loading || !events.length) return;
+    const teamId = searchParams.get('team');
+    const eventId = searchParams.get('event') || searchParams.get('joinEvent');
+    if (!teamId && !eventId) return;
+    setDeepLinkHandled(true);
+    setSubTab('activities');
+
+    if (teamId) {
+      const event = events.find((e) => e.teams.some((t) => t.id === teamId));
+      if (!event) return;
+      const alreadyIn = event.registrations.some((r) => r.team_id === teamId && r.user_id === profile?.id);
+      if (!alreadyIn) {
+        void requestJoinEventTeam(teamId)
+          .then(() => {
+            toast('Join request sent to the team leader');
+            return refresh();
+          })
+          .catch((err) => toast(err instanceof Error ? err.message : 'Failed to request join.'))
+          .finally(() => setTeamTarget({ event, teamId }));
+      } else {
+        setTeamTarget({ event, teamId });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, loading, deepLinkHandled]);
+
+  const handleDecideTeamJoin = async (registrationId: string, approve: boolean) => {
+    setDecidingId(registrationId);
+    try {
+      await decideEventTeamJoin(registrationId, approve);
+      toast(approve ? 'Join request approved' : 'Join request rejected');
+      await refresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to decide join request.');
+    } finally {
+      setDecidingId(null);
+    }
   };
 
   const handleSelfRegister = async (eventId: string) => {
@@ -117,6 +169,11 @@ export function PortalPage() {
         {assignments.length > 0 && (
           <button className={`tab ${subTab === 'reimbursements' ? 'active' : ''}`} onClick={() => setSubTab('reimbursements')}>
             My Reimbursements ({myReimbursements.length})
+          </button>
+        )}
+        {isCommitteeUser && (
+          <button className={`tab ${subTab === 'team-requests' ? 'active' : ''}`} onClick={() => setSubTab('team-requests')}>
+            Team Requests ({pendingTeamJoins.length})
           </button>
         )}
       </div>
@@ -340,6 +397,59 @@ export function PortalPage() {
             </div>
           ))}
           {!myReimbursements.length && <div style={{ fontSize: 12, color: 'var(--muted)' }}>No reimbursements submitted yet.</div>}
+        </div>
+      )}
+
+      {subTab === 'team-requests' && isCommitteeUser && (
+        <div>
+          <p style={{ fontSize: 12, color: 'var(--muted)' }}>
+            Team join requests are normally approved by the team leader — Committee can also decide here if a
+            leader is unavailable.
+          </p>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Activity</th>
+                <th>Team</th>
+                <th>Requested By</th>
+                <th>Department</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {pendingTeamJoins.map(({ event, registration }) => (
+                <tr key={registration.id}>
+                  <td>{event.name}</td>
+                  <td>{event.teams.find((t) => t.id === registration.team_id)?.team_name || '—'}</td>
+                  <td>{registration.staff_name}</td>
+                  <td>{registration.department || '—'}</td>
+                  <td style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn ghost"
+                      disabled={decidingId === registration.id}
+                      onClick={() => void handleDecideTeamJoin(registration.id, false)}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      className="btn primary"
+                      disabled={decidingId === registration.id}
+                      onClick={() => void handleDecideTeamJoin(registration.id, true)}
+                    >
+                      Approve
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!pendingTeamJoins.length && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                    No pending team join requests.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 

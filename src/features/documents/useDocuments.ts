@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { evidenceUrl } from '../reimbursements/storage';
+import { generateApprovedExpenseNotePdf } from '../../lib/expenseNotePdf';
 import type { DocumentRegistryRow } from '../../types/database';
 import { documentSignedUrl, removeDocumentFile, uploadDocumentFile } from './storage';
 import type { VirtualDocument } from './types';
@@ -83,6 +84,63 @@ export async function deleteDocument(doc: DocumentRegistryRow) {
 export async function openDocument(bucket: string, path: string): Promise<string | null> {
   if (bucket === 'unitedbml-documents') return documentSignedUrl(path);
   return evidenceUrl(path);
+}
+
+export interface ApprovedNoteSummary {
+  expenseRequestId: string;
+  requestNumber: string | null;
+  title: string | null;
+  eventId: string | null;
+  eventName: string | null;
+  approvedAt: string | null;
+}
+
+/** Approved expense requests, surfaced as on-demand-generated "Approved Expense Approval Note"
+ * documents (V12.10 Documents Module) — the PDF isn't stored, it's regenerated each time it's
+ * opened from the same data used for the Procurement/AP email attachment. */
+export function useApprovedNotes() {
+  const [notes, setNotes] = useState<ApprovedNoteSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from('expense_requests')
+      .select('id,request_number,title,event_id,event_name,approved_at')
+      .eq('status', 'Approved')
+      .order('approved_at', { ascending: false })
+      .then(({ data }) => {
+        if (!active) return;
+        setNotes(
+          (data ?? []).map((r) => ({
+            expenseRequestId: r.id,
+            requestNumber: r.request_number,
+            title: r.title,
+            eventId: r.event_id,
+            eventName: r.event_name,
+            approvedAt: r.approved_at,
+          }))
+        );
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return { notes, loading };
+}
+
+/** Generates the Approved Expense Approval Note PDF and opens it in a new tab via a blob URL. */
+export async function openApprovedNote(expenseRequestId: string) {
+  const attachment = await generateApprovedExpenseNotePdf(expenseRequestId);
+  const binary = atob(attachment.content);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: attachment.contentType });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /**
