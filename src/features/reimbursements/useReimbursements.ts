@@ -526,3 +526,69 @@ export function useVendorSearch(query: string) {
 
   return results;
 }
+
+export function useVendorMaster() {
+  const [vendors, setVendors] = useState<VendorMasterRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: fetchError } = await supabase.from('vendor_master').select('*').order('name', { ascending: true });
+    if (fetchError) {
+      setError(fetchError.message);
+      setLoading(false);
+      return;
+    }
+    setVendors(data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { vendors, loading, error, reload };
+}
+
+export async function saveVendor(payload: { vendorAccount: string; name: string; workerId: string; status: string }, isNew: boolean) {
+  if (!payload.vendorAccount.trim() || !payload.name.trim()) {
+    throw new Error('Vendor Account and Name are required.');
+  }
+  if (isNew) {
+    const { error } = await supabase.from('vendor_master').insert({
+      vendor_account: payload.vendorAccount.trim(),
+      name: payload.name.trim(),
+      worker_id: payload.workerId.trim() || null,
+      status: payload.status,
+    } satisfies Partial<VendorMasterRow>);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('vendor_master')
+      .update({ name: payload.name.trim(), worker_id: payload.workerId.trim() || null, status: payload.status })
+      .eq('vendor_account', payload.vendorAccount.trim());
+    if (error) throw error;
+  }
+}
+
+export async function deleteVendor(vendorAccount: string) {
+  const { error } = await supabase.from('vendor_master').delete().eq('vendor_account', vendorAccount);
+  if (error) throw error;
+}
+
+export async function upsertVendorRows(rows: { vendorAccount: string; name: string; workerId: string; status: string }[]) {
+  const payload = rows
+    .filter((r) => r.vendorAccount.trim() && r.name.trim())
+    .map((r) => ({
+      vendor_account: r.vendorAccount.trim(),
+      name: r.name.trim(),
+      worker_id: r.workerId.trim() || null,
+      status: r.status.trim() || 'Active',
+    }));
+  if (!payload.length) return { affected: 0 };
+  const { error } = await supabase.from('vendor_master').upsert(payload, { onConflict: 'vendor_account' });
+  if (error) throw error;
+  return { affected: payload.length };
+}
