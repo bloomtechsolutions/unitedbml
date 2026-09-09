@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../lib/AuthContext';
+import { useCommitteeMembers } from '../committee/useCommittee';
+import { isVacant } from '../committee/availability';
 import { StaffEditModal } from './StaffEditModal';
 import { StaffImportModal } from './StaffImportModal';
 import type { StaffRow } from '../../types/database';
@@ -10,6 +12,15 @@ import { useStaffRoster } from './useStaff';
 export function StaffMasterPage() {
   const { isAdministrator } = useAuth();
   const { staff, loading, error, reload } = useStaffRoster();
+  const { members: committeeMembers } = useCommitteeMembers();
+
+  const committeeRoleByUid = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of committeeMembers) {
+      if (!isVacant(m) && m.staff_uid) map.set(m.staff_uid, m.role);
+    }
+    return map;
+  }, [committeeMembers]);
 
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
@@ -112,6 +123,7 @@ export function StaffMasterPage() {
             <th>Division</th>
             <th>Department</th>
             <th>Unit</th>
+            <th>UnitedBML</th>
             <th>Status</th>
             <th />
           </tr>
@@ -126,6 +138,13 @@ export function StaffMasterPage() {
               <td>{s.department || '—'}</td>
               <td>{s.unit || '—'}</td>
               <td>
+                {committeeRoleByUid.has(s.uid) ? (
+                  <span className="pill plan">{committeeRoleByUid.get(s.uid)}</span>
+                ) : (
+                  <span style={{ color: 'var(--muted)', fontSize: 11 }}>Staff Member</span>
+                )}
+              </td>
+              <td>
                 <span className={`pill ${s.status === 'Inactive' ? 'cancel' : 'open'}`}>{s.status}</span>
               </td>
               <td>
@@ -137,7 +156,7 @@ export function StaffMasterPage() {
           ))}
           {!filtered.length && (
             <tr>
-              <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+              <td colSpan={9} style={{ textAlign: 'center', color: 'var(--muted)' }}>
                 No staff records match your filters.
               </td>
             </tr>

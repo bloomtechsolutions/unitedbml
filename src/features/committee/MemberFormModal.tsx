@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
-import type { CommitteeMemberRow } from '../../types/database';
+import type { CommitteeMemberRow, StaffRow } from '../../types/database';
 import { COMMITTEE_AVAILABILITY_OPTIONS, COMMITTEE_STATUS_OPTIONS, type CommitteeTerm, type DirectoryUser } from './types';
 
 interface Values {
@@ -36,10 +36,11 @@ interface Props {
   directory: DirectoryUser[];
   assignedUserIds: Set<string>;
   term: CommitteeTerm | null;
+  staffByUid: Map<string, StaffRow>;
   onSave: (payload: Partial<CommitteeMemberRow>) => Promise<void>;
 }
 
-export function MemberFormModal({ open, onClose, member, directory, assignedUserIds, term, onSave }: Props) {
+export function MemberFormModal({ open, onClose, member, directory, assignedUserIds, term, staffByUid, onSave }: Props) {
   const [values, setValues] = useState<Values>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,9 @@ export function MemberFormModal({ open, onClose, member, directory, assignedUser
   const availableDirectory = directory.filter(
     (u) => u.id === member.user_id || !assignedUserIds.has(u.id)
   );
+
+  const selectedDirectoryUser = directory.find((u) => u.id === values.directoryId);
+  const selectedStaff = selectedDirectoryUser?.member_uid ? staffByUid.get(selectedDirectoryUser.member_uid) : undefined;
 
   const applyDirectoryUser = (id: string) => {
     const user = directory.find((u) => u.id === id);
@@ -126,6 +130,37 @@ export function MemberFormModal({ open, onClose, member, directory, assignedUser
               </option>
             ))}
           </select>
+          {selectedStaff && (
+            <div className="committee-member-preview">
+              <div className="mini">
+                <small>Job Title</small>
+                <b>{selectedStaff.job_title || '—'}</b>
+              </div>
+              <div className="mini">
+                <small>Division</small>
+                <b>{selectedStaff.division || '—'}</b>
+              </div>
+              <div className="mini">
+                <small>Department</small>
+                <b>{selectedStaff.department || '—'}</b>
+              </div>
+              <div className="mini">
+                <small>Unit</small>
+                <b>{selectedStaff.unit || '—'}</b>
+              </div>
+              <div className="mini">
+                <small>Staff Master UID</small>
+                <b>{selectedStaff.uid}</b>
+              </div>
+              <div className="mini">
+                <small>Match Status</small>
+                <b>Matched</b>
+              </div>
+            </div>
+          )}
+          {values.directoryId && !selectedStaff && (
+            <div className="committee-loading">No Staff Master record matched for this user&apos;s UID/email yet.</div>
+          )}
         </div>
         <div className="field">
           <label>Name</label>
