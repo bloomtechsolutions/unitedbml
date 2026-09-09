@@ -7,6 +7,7 @@ import { useToast } from '../../lib/ToastContext';
 import { ContingencyPanel } from '../settlements/ContingencyPanel';
 import { SettlementModal } from '../settlements/SettlementModal';
 import { useSettlementRegister } from '../settlements/useSettlements';
+import { BudgetModal } from './BudgetModal';
 import { RequestDetailModal } from './RequestDetailModal';
 import { RequestFormModal } from './RequestFormModal';
 import type { ExpenseRequestWithLines } from './types';
@@ -28,7 +29,7 @@ export function FinancePage() {
   const { requests, loading, error, reload } = useExpenseRequests();
   const { reversals, loading: reversalsLoading, reload: reloadReversals } = useReversals();
   const actor = useCurrentActor();
-  const { profile } = useAuth();
+  const { profile, isCommitteeUser } = useAuth();
   const toast = useToast();
 
   const [subTab, setSubTab] = useState<SubTab>('requests');
@@ -39,6 +40,7 @@ export function FinancePage() {
   const [busyReversalId, setBusyReversalId] = useState<string | null>(null);
   const [settlementKey, setSettlementKey] = useState<string | null>(null);
   const [settlementStatusFilter, setSettlementStatusFilter] = useState('');
+  const [budgetModalOpen, setBudgetModalOpen] = useState(false);
   const searchParams = useSearchParams();
   const { rows: settlementRows, loading: settlementsLoading, reload: reloadSettlements } = useSettlementRegister();
 
@@ -91,7 +93,12 @@ export function FinancePage() {
           <h2>Finance</h2>
           <p>Submit expense requests, track approvals, and monitor budget utilization.</p>
         </div>
-        <div className="actions">
+        <div className="actions" style={{ display: 'flex', gap: 8 }}>
+          {isCommitteeUser && (
+            <button className="btn ghost" onClick={() => setBudgetModalOpen(true)}>
+              Edit Annual Budget
+            </button>
+          )}
           <button className="btn primary" onClick={() => setFormOpen(true)}>
             + New Request
           </button>
@@ -367,6 +374,15 @@ export function FinancePage() {
         onRefresh={refreshAll}
       />
       <SettlementModal settlementKey={settlementKey} onClose={() => setSettlementKey(null)} onChanged={reloadSettlements} />
+      <BudgetModal
+        open={budgetModalOpen}
+        onClose={() => setBudgetModalOpen(false)}
+        budget={budget}
+        onSaved={async () => {
+          await reloadBudget();
+          toast('Annual budget updated');
+        }}
+      />
     </div>
   );
 }
