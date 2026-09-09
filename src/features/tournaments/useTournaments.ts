@@ -11,26 +11,37 @@ import type {
 } from '../../types/database';
 import type { TournamentWithChildren } from './types';
 
+interface EventSummary {
+  name: string;
+  event_date: string | null;
+  cancelled: boolean;
+}
+
 function assemble(
   tournaments: TournamentRow[],
-  eventNames: Map<string, string>,
+  events: Map<string, EventSummary>,
   teams: TournamentTeamRow[],
   registrations: TournamentRegistrationRow[],
   updates: TournamentUpdateRow[],
   matches: TournamentMatchRow[],
   winners: TournamentWinnerRow[]
 ): TournamentWithChildren[] {
-  return tournaments.map((t) => ({
-    ...t,
-    eventName: eventNames.get(t.event_id) ?? t.name,
-    teams: teams.filter((x) => x.tournament_id === t.id),
-    registrations: registrations.filter((x) => x.tournament_id === t.id),
-    updates: updates.filter((x) => x.tournament_id === t.id).sort((a, b) => b.created_at.localeCompare(a.created_at)),
-    matches: matches
-      .filter((x) => x.tournament_id === t.id)
-      .sort((a, b) => (a.match_date ?? '').localeCompare(b.match_date ?? '') || (a.match_time ?? '').localeCompare(b.match_time ?? '')),
-    winners: winners.filter((x) => x.tournament_id === t.id),
-  }));
+  return tournaments.map((t) => {
+    const event = events.get(t.event_id);
+    return {
+      ...t,
+      eventName: event?.name ?? t.name,
+      eventDate: event?.event_date ?? null,
+      eventCancelled: event?.cancelled ?? false,
+      teams: teams.filter((x) => x.tournament_id === t.id),
+      registrations: registrations.filter((x) => x.tournament_id === t.id),
+      updates: updates.filter((x) => x.tournament_id === t.id).sort((a, b) => b.created_at.localeCompare(a.created_at)),
+      matches: matches
+        .filter((x) => x.tournament_id === t.id)
+        .sort((a, b) => (a.match_date ?? '').localeCompare(b.match_date ?? '') || (a.match_time ?? '').localeCompare(b.match_time ?? '')),
+      winners: winners.filter((x) => x.tournament_id === t.id),
+    };
+  });
 }
 
 export function useTournaments() {
@@ -43,7 +54,7 @@ export function useTournaments() {
     setError(null);
     const [tRes, eRes, teamsRes, regsRes, updatesRes, matchesRes, winnersRes] = await Promise.all([
       supabase.from('tournaments').select('*').order('created_at', { ascending: false }),
-      supabase.from('events').select('id,name'),
+      supabase.from('events').select('id,name,event_date,cancelled_at,manual_state,status'),
       supabase.from('tournament_teams').select('*'),
       supabase.from('tournament_registrations').select('*'),
       supabase.from('tournament_updates').select('*'),
@@ -57,11 +68,23 @@ export function useTournaments() {
       setLoading(false);
       return;
     }
-    const eventNames = new Map((eRes.data ?? []).map((e) => [e.id, e.name] as const));
+    const events = new Map(
+      (eRes.data ?? []).map(
+        (e) =>
+          [
+            e.id,
+            {
+              name: e.name,
+              event_date: e.event_date,
+              cancelled: !!e.cancelled_at || e.manual_state === 'Cancelled' || e.status === 'Cancelled',
+            },
+          ] as const
+      )
+    );
     setTournaments(
       assemble(
         tRes.data ?? [],
-        eventNames,
+        events,
         teamsRes.data ?? [],
         regsRes.data ?? [],
         updatesRes.data ?? [],
@@ -245,6 +268,11 @@ export async function saveWinner(payload: Partial<TournamentWinnerRow> & { tourn
   if (error) throw error;
 }
 
+export async function deleteWinner(id: string) {
+  const { error } = await supabase.from('tournament_winners').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export async function fetchPublicStats(tournamentId: string) {
   const { data, error } = await supabase.rpc('get_tournament_public_stats', { p_tournament_id: tournamentId });
   if (error) throw error;
@@ -256,4 +284,86 @@ export async function fetchPublicStats(tournamentId: string) {
     completedMatches: number;
     departments: { department: string; count: number }[];
   };
+}
+
+export interface LinkedTournament {
+  id: string;
+  tournament_mode: string;
+}
+
+/** Whether an Event has a Tournament attached — used by the Events/Attendance tab to switch
+ * from plain manual roster entry to Sync Registrations + Add Walk-in (V13.17). */
+export function useLinkedTournament(eventId: string) {
+  const [tournament, setTournament] = useState<LinkedTournament | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!eventId) {
+      setTournament(null);
+      return;
+    }
+    const { data } = await supabase.from('tournaments').select('id,tournament_mode').eq('event_id', eventId).maybeSingle();
+    setTournament(data ?? null);
+  }, [eventId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return tournament;
+}
+
+/**
+ * Syncs approved Tournament registrations (flattened from Teams mode too) into the linked
+ * Event's attendance roster. Ports the legacy syncTournamentAttendance() behaviour:
+ * - identity-matches on staff_uid (falling back to the registration's user_id, which is always
+ *   present in our schema, unlike legacy's optional email/name fallback) so re-syncing never
+ *   duplicates a row.
+ * - never overwrites an existing row's attended status.
+ * - a roster row this sync previously created, whose registration is no longer Approved, is
+ *   removed if attendance was never marked, or flagged 'Registration Changed' (kept) if it was.
+ */
+export async function syncTournamentAttendance(eventId: string, tournamentId: string) {
+  const [{ data: registrations }, { data: attendance }] = await Promise.all([
+    supabase.from('tournament_registrations').select('*').eq('tournament_id', tournamentId),
+    supabase.from('event_attendance').select('*').eq('event_id', eventId),
+  ]);
+  const approved = (registrations ?? []).filter((r) => r.status === 'Approved');
+  const approvedKeys = new Set(approved.map((r) => r.staff_uid || r.user_id));
+  const existing = attendance ?? [];
+
+  let added = 0;
+  for (const r of approved) {
+    const key = r.staff_uid || r.user_id;
+    if (existing.some((a) => a.staff_uid === key)) continue;
+    const { error } = await supabase.from('event_attendance').insert({
+      event_id: eventId,
+      staff_uid: key,
+      staff_name: r.staff_name || r.email || 'Participant',
+      contact_no: r.contact_no,
+      attendance_status: 'Pending',
+      attended: false,
+      data: { source: 'Tournament', tournamentId, registrationId: r.id, teamName: r.team_id },
+    } satisfies Partial<import('../../types/database').EventAttendanceRow>);
+    if (!error) added++;
+  }
+
+  let flagged = 0;
+  let removed = 0;
+  for (const row of existing) {
+    const source = row.data as { source?: string; tournamentId?: string } | null;
+    if (source?.source !== 'Tournament' || source.tournamentId !== tournamentId) continue;
+    if (approvedKeys.has(row.staff_uid)) continue;
+    if (row.attended) {
+      await supabase
+        .from('event_attendance')
+        .update({ data: { ...row.data, source: 'Tournament History' } })
+        .eq('id', row.id);
+      flagged++;
+    } else {
+      await supabase.from('event_attendance').delete().eq('id', row.id);
+      removed++;
+    }
+  }
+
+  return { added, flagged, removed };
 }

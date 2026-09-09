@@ -1,27 +1,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
-import type { TournamentMatchRow, TournamentTeamRow } from '../../types/database';
-import { MatchFormModal } from './MatchFormModal';
+import type { TournamentTeamRow } from '../../types/database';
 import { SetupModal } from './SetupModal';
 import { TeamModal } from './TeamModal';
-import { LIFECYCLE_STAGES, lifecycleStage } from './types';
+import { DISPLAY_PHASES, tournamentDisplayPhase } from './types';
 import type { TournamentWithChildren } from './types';
 import { UpdateFormModal } from './UpdateFormModal';
 import { WinnerFormModal } from './WinnerFormModal';
 import {
   createTeam,
-  deleteMatch,
+  deleteWinner,
   fetchPublicStats,
   requestJoinTeam,
   resolveMyDepartment,
   selfRegisterIndividual,
 } from './useTournaments';
 
-type Tab = 'overview' | 'registration' | 'matches' | 'live' | 'results';
+type Tab = 'overview' | 'registration' | 'results';
 
 interface Props {
   tournament: TournamentWithChildren | null;
@@ -35,8 +35,6 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
   const [tab, setTab] = useState<Tab>('overview');
   const [setupOpen, setSetupOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
-  const [matchModalOpen, setMatchModalOpen] = useState(false);
-  const [editingMatch, setEditingMatch] = useState<TournamentMatchRow | null>(null);
   const [winnerModalOpen, setWinnerModalOpen] = useState(false);
   const [openTeam, setOpenTeam] = useState<TournamentTeamRow | null>(null);
   const [newTeamName, setNewTeamName] = useState('');
@@ -53,7 +51,7 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
 
   const isTeamsMode = tournament.tournament_mode === 'Teams';
   const myRegistration = tournament.registrations.find((r) => r.user_id === profile?.id);
-  const stage = lifecycleStage(tournament.status);
+  const phase = tournamentDisplayPhase(tournament.status, tournament.eventDate, tournament.winners.length > 0, tournament.eventCancelled);
 
   const handleSelfRegister = async () => {
     if (!profile) return;
@@ -115,43 +113,42 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
     }
   };
 
-  const handleDeleteMatch = async (match: TournamentMatchRow) => {
-    if (!confirm('Remove this match?')) return;
-    await deleteMatch(match.id);
-    await onRefresh();
-    toast('Match removed');
+  const handleRemoveWinner = async (id: string) => {
+    if (!confirm('Remove this result?')) return;
+    try {
+      await deleteWinner(id);
+      await onRefresh();
+      toast('Result removed');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to remove result.');
+    }
   };
 
-  const upcomingMatches = tournament.matches.filter((m) => m.status === 'Scheduled' || m.status === 'Live').slice(0, 5);
-  const liveMatches = tournament.matches.filter((m) => m.status === 'Live' || m.status === 'Completed').slice(0, 8);
   const pinnedUpdates = tournament.updates.filter((u) => u.is_pinned);
+  const existingCategories = Array.from(new Set(tournament.winners.map((w) => w.position).filter(Boolean)));
 
   return (
     <Modal open onClose={onClose} title={tournament.name} wide>
       <div className="tabs">
-        {(['overview', 'registration', 'matches', 'live', 'results'] as Tab[]).map((t) => (
+        {(['overview', 'registration', 'results'] as Tab[]).map((t) => (
           <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview'
-              ? 'Overview'
-              : t === 'registration'
-                ? 'Registration & Teams'
-                : t === 'matches'
-                  ? 'Match Schedule'
-                  : t === 'live'
-                    ? 'Live Screen'
-                    : 'Results & Stats'}
+            {t === 'overview' ? 'Overview' : t === 'registration' ? 'Registration & Teams' : 'Results & Stats'}
           </button>
         ))}
       </div>
 
       {tab === 'overview' && (
         <div>
-          <div className="tour-stage-line" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {LIFECYCLE_STAGES.map((s) => (
-              <span key={s} className={`pill ${s === stage ? 'open' : 'plan'}`}>
-                {s}
-              </span>
-            ))}
+          <div className="tour-stage-line" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            {phase === 'Cancelled' ? (
+              <span className="pill cancel">Cancelled</span>
+            ) : (
+              DISPLAY_PHASES.map((s) => (
+                <span key={s} className={`pill ${s === phase ? 'open' : 'plan'}`}>
+                  {s}
+                </span>
+              ))
+            )}
           </div>
           <div className="kpis">
             <div className="kpi">
@@ -163,22 +160,30 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
               <strong>{tournament.teams.length}</strong>
             </div>
             <div className="kpi">
-              <div className="lbl">Matches</div>
-              <strong>{tournament.matches.length}</strong>
+              <div className="lbl">Results Recorded</div>
+              <strong>{tournament.winners.length}</strong>
             </div>
             <div className="kpi">
-              <div className="lbl">Completed</div>
-              <strong>{tournament.matches.filter((m) => m.status === 'Completed').length}</strong>
+              <div className="lbl">Event Date</div>
+              <strong style={{ fontSize: 16 }}>{tournament.eventDate || '—'}</strong>
             </div>
           </div>
           <p>
             <b>Venue:</b> {tournament.venue || '—'} &nbsp; <b>Sport:</b> {tournament.sport || '—'}
           </p>
           <p style={{ fontSize: 13 }}>{tournament.rules}</p>
+          {pinnedUpdates.map((u) => (
+            <div key={u.id} className="event-alert warning">
+              <b>{u.title}</b> — {u.message}
+            </div>
+          ))}
           {isCommitteeUser && (
             <div className="modal-actions">
+              <Link href={`/events?open=${tournament.event_id}`} className="btn ghost">
+                Attendance →
+              </Link>
               <button className="btn ghost" onClick={() => setSetupOpen(true)}>
-                Setup
+                Registration Settings
               </button>
               <button className="btn primary" onClick={() => setUpdateOpen(true)}>
                 Post Update
@@ -192,14 +197,7 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
               <p style={{ fontSize: 12 }}>{u.message}</p>
             </div>
           ))}
-          <h4 style={{ marginTop: 16 }}>Next Matches</h4>
-          {upcomingMatches.map((m) => (
-            <div key={m.id} style={{ fontSize: 12, padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
-              {m.match_date} {m.match_time} — {(isTeamsMode ? m.team_a : m.participant_a) || '—'} vs{' '}
-              {(isTeamsMode ? m.team_b : m.participant_b) || '—'}
-            </div>
-          ))}
-          {!upcomingMatches.length && <p style={{ color: 'var(--muted)' }}>No upcoming matches scheduled.</p>}
+          {!tournament.updates.length && <p style={{ color: 'var(--muted)' }}>No updates posted yet.</p>}
         </div>
       )}
 
@@ -249,9 +247,13 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
                 {tournament.teams.map((team) => {
                   const members = tournament.registrations.filter((r) => r.team_id === team.id && r.status === 'Approved');
                   const isMember = tournament.registrations.some((r) => r.team_id === team.id && r.user_id === profile?.id);
+                  const ready = !tournament.team_size || members.length >= tournament.team_size;
                   return (
                     <div key={team.id} className="event-card" style={{ padding: 16 }}>
-                      <h3 style={{ margin: '0 0 6px' }}>{team.team_name}</h3>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <h3 style={{ margin: '0 0 6px' }}>{team.team_name}</h3>
+                        <span className={`pill ${ready ? 'done' : 'plan'}`}>{ready ? 'Ready' : 'Filling'}</span>
+                      </div>
                       <small style={{ color: 'var(--muted)' }}>
                         {members.length}
                         {tournament.team_size ? `/${tournament.team_size}` : ''} members
@@ -277,115 +279,6 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
         </div>
       )}
 
-      {tab === 'matches' && (
-        <div>
-          {isCommitteeUser && (
-            <div className="toolbar">
-              <div />
-              <button
-                className="btn primary"
-                onClick={() => {
-                  setEditingMatch(null);
-                  setMatchModalOpen(true);
-                }}
-              >
-                + Add Match
-              </button>
-            </div>
-          )}
-          <table className="table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Stage</th>
-                <th>Date</th>
-                <th>Match</th>
-                <th>Score</th>
-                <th>Status</th>
-                {isCommitteeUser && <th />}
-              </tr>
-            </thead>
-            <tbody>
-              {tournament.matches.map((m) => (
-                <tr key={m.id}>
-                  <td>{m.match_no}</td>
-                  <td>{m.stage}</td>
-                  <td>
-                    {m.match_date} {m.match_time}
-                  </td>
-                  <td>
-                    {(isTeamsMode ? m.team_a : m.participant_a) || '—'} vs {(isTeamsMode ? m.team_b : m.participant_b) || '—'}
-                  </td>
-                  <td>
-                    {m.score_a ?? '—'} : {m.score_b ?? '—'}
-                  </td>
-                  <td>
-                    <span className="pill plan">{m.status}</span>
-                  </td>
-                  {isCommitteeUser && (
-                    <td className="task-actions">
-                      <button
-                        className="btn ghost"
-                        onClick={() => {
-                          setEditingMatch(m);
-                          setMatchModalOpen(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button className="btn danger" onClick={() => void handleDeleteMatch(m)}>
-                        Delete
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {!tournament.matches.length && (
-                <tr>
-                  <td colSpan={isCommitteeUser ? 7 : 6} style={{ textAlign: 'center', color: 'var(--muted)' }}>
-                    No matches scheduled yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {tab === 'live' && (
-        <div>
-          {pinnedUpdates.map((u) => (
-            <div key={u.id} className="event-alert warning">
-              <b>{u.title}</b> — {u.message}
-            </div>
-          ))}
-          <h4 style={{ marginTop: 16 }}>Live / Recent Matches</h4>
-          {liveMatches.map((m) => (
-            <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-              <span>
-                {(isTeamsMode ? m.team_a : m.participant_a) || '—'} vs {(isTeamsMode ? m.team_b : m.participant_b) || '—'}
-              </span>
-              <b>
-                {m.score_a ?? 0} : {m.score_b ?? 0}
-              </b>
-            </div>
-          ))}
-          {!liveMatches.length && <p style={{ color: 'var(--muted)' }}>No live or recent matches.</p>}
-          {!!tournament.winners.length && (
-            <>
-              <h4 style={{ marginTop: 16 }}>Winners</h4>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {tournament.winners.map((w) => (
-                  <span key={w.id} className="pill done">
-                    {w.position}: {w.winner_name}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {tab === 'results' && (
         <div>
           <div className="kpis">
@@ -398,8 +291,8 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
               <strong>{stats?.teams ?? tournament.teams.length}</strong>
             </div>
             <div className="kpi">
-              <div className="lbl">Matches Completed</div>
-              <strong>{stats?.completedMatches ?? tournament.matches.filter((m) => m.status === 'Completed').length}</strong>
+              <div className="lbl">Results Recorded</div>
+              <strong>{tournament.winners.length}</strong>
             </div>
             <div className="kpi">
               <div className="lbl">Pending Approvals</div>
@@ -407,17 +300,29 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
             </div>
           </div>
 
+          {!!tournament.winners.length && (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '16px 0' }}>
+              {tournament.winners.slice(0, 3).map((w) => (
+                <div key={w.id} className="event-card" style={{ padding: '14px 18px', flex: '1 1 160px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>{w.position}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{w.winner_name}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {isCommitteeUser && (
             <button className="btn primary" onClick={() => setWinnerModalOpen(true)}>
-              + Add Winner
+              + Add Result
             </button>
           )}
           <table className="table" style={{ marginTop: 12 }}>
             <thead>
               <tr>
-                <th>Position</th>
+                <th>Result / Award Category</th>
                 <th>Winner</th>
                 <th>Remarks</th>
+                {isCommitteeUser && <th />}
               </tr>
             </thead>
             <tbody>
@@ -426,12 +331,19 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
                   <td>{w.position}</td>
                   <td>{w.winner_name}</td>
                   <td>{w.remarks || '—'}</td>
+                  {isCommitteeUser && (
+                    <td>
+                      <button className="btn danger" onClick={() => void handleRemoveWinner(w.id)}>
+                        Remove
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {!tournament.winners.length && (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--muted)' }}>
-                    No winners recorded yet.
+                  <td colSpan={isCommitteeUser ? 4 : 3} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                    No results recorded yet.
                   </td>
                 </tr>
               )}
@@ -459,21 +371,14 @@ export function TournamentWorkspaceModal({ tournament, onClose, onRefresh }: Pro
 
       <SetupModal tournament={setupOpen ? tournament : null} onClose={() => setSetupOpen(false)} onSaved={onRefresh} />
       <UpdateFormModal open={updateOpen} onClose={() => setUpdateOpen(false)} tournamentId={tournament.id} onSaved={onRefresh} />
-      <MatchFormModal
-        open={matchModalOpen}
-        onClose={() => setMatchModalOpen(false)}
-        tournamentId={tournament.id}
-        isTeamsMode={isTeamsMode}
-        teams={tournament.teams}
-        editing={editingMatch}
-        onSaved={onRefresh}
-      />
       <WinnerFormModal
         open={winnerModalOpen}
         onClose={() => setWinnerModalOpen(false)}
         tournamentId={tournament.id}
         isTeamsMode={isTeamsMode}
         teams={tournament.teams}
+        registrations={tournament.registrations}
+        existingCategories={existingCategories}
         onSaved={onRefresh}
       />
       <TeamModal

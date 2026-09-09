@@ -34,6 +34,8 @@ export function EventsPage() {
 
   useEffect(() => {
     if (searchParams.get('new') === '1') setFormOpen(true);
+    const openId = searchParams.get('open');
+    if (openId) setDetailId(openId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

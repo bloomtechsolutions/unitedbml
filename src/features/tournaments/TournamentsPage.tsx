@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { TournamentWorkspaceModal } from './TournamentWorkspaceModal';
+import { tournamentDisplayPhase } from './types';
 import { useTournaments } from './useTournaments';
 
 export function TournamentsPage() {
@@ -28,17 +29,16 @@ export function TournamentsPage() {
       <div className="event-grid">
         {tournaments.map((t) => {
           const registered = t.registrations.filter((r) => r.status === 'Approved').length;
+          const phase = tournamentDisplayPhase(t.status, t.eventDate, t.winners.length > 0, t.eventCancelled);
           return (
             <div key={t.id} className="event-card" onClick={() => setOpenId(t.id)} style={{ padding: 16 }}>
-              <span className={`pill ${t.status === 'Registration Open' ? 'open' : t.status === 'Completed' ? 'done' : 'plan'}`}>
-                {t.status}
-              </span>
+              <span className={`pill ${phase === 'Registration Open' ? 'open' : phase === 'Completed' ? 'done' : 'plan'}`}>{phase}</span>
               <h3 style={{ margin: '10px 0 4px' }}>{t.name}</h3>
               <small style={{ color: 'var(--muted)' }}>
                 {t.eventName} · {t.tournament_mode}
               </small>
               <p style={{ fontSize: 12, color: 'var(--muted)', margin: '10px 0' }}>
-                {registered} registered · {t.teams.length} teams · {t.matches.length} matches
+                {registered} registered · {t.teams.length} teams
               </p>
             </div>
           );

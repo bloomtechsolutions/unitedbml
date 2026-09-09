@@ -22,6 +22,7 @@ import {
 import { buildEventTimeline } from './timeline';
 import type { CommitteeMemberOption, EventWithChildren, StaffOption } from './types';
 import { TaskFormModal } from './TaskFormModal';
+import { syncTournamentAttendance, useLinkedTournament } from '../tournaments/useTournaments';
 import {
   closeEventFinanceSettlement,
   deleteAttendance,
@@ -71,6 +72,8 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
   const [editingTask, setEditingTask] = useState<EventTaskRow | null>(null);
   const [staffQuery, setStaffQuery] = useState('');
   const staffResults = useStaffSearch(staffQuery);
+  const linkedTournament = useLinkedTournament(event?.id ?? '');
+  const [syncing, setSyncing] = useState(false);
   const { statusByEvent: financeByEvent } = useEventFinanceSummary();
   const { requests: allRequests, reload: reloadRequests } = useExpenseRequests();
   const [viewingRequest, setViewingRequest] = useState<ExpenseRequestWithLines | null>(null);
@@ -128,6 +131,20 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
     toast('Task removed');
   };
 
+  const handleSyncTournamentAttendance = async () => {
+    if (!linkedTournament) return;
+    setSyncing(true);
+    try {
+      const result = await syncTournamentAttendance(event.id, linkedTournament.id);
+      await onRefresh();
+      toast(`Synced: ${result.added} added${result.flagged ? `, ${result.flagged} flagged` : ''}${result.removed ? `, ${result.removed} removed` : ''}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to sync tournament registrations.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const addStaffToAttendance = async (staff: StaffOption) => {
     await upsertAttendance({
       event_id: event.id,
@@ -136,6 +153,7 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
       contact_no: staff.contact_no,
       attendance_status: 'Pending',
       attended: false,
+      data: linkedTournament ? { source: 'Walk-in' } : undefined,
     });
     setStaffQuery('');
     await onRefresh();
@@ -481,9 +499,19 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
 
       {tab === 'attendance' && (
         <div>
+          {linkedTournament && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <p style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', margin: 0 }}>
+                Linked to a Tournament — sync approved registrations into this roster, or add walk-ins below.
+              </p>
+              <button className="ub-btn ub-btn-primary" style={{ padding: '7px 14px', fontSize: 12.5 }} disabled={syncing} onClick={() => void handleSyncTournamentAttendance()}>
+                {syncing ? 'Syncing…' : 'Sync Registrations'}
+              </button>
+            </div>
+          )}
           <div style={{ marginBottom: 14 }}>
             <input
-              placeholder="Search staff to add…"
+              placeholder={linkedTournament ? 'Search staff to add as walk-in…' : 'Search staff to add…'}
               value={staffQuery}
               onChange={(e) => setStaffQuery(e.target.value)}
               style={{ minWidth: 260 }}
