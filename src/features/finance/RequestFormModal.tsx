@@ -22,9 +22,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: () => Promise<void>;
+  defaultEventId?: string;
 }
 
-export function RequestFormModal({ open, onClose, onCreated }: Props) {
+export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: Props) {
   const { profile } = useAuth();
   const [title, setTitle] = useState('');
   const [eventId, setEventId] = useState('');
@@ -41,7 +42,7 @@ export function RequestFormModal({ open, onClose, onCreated }: Props) {
   useEffect(() => {
     if (!open) return;
     setTitle('');
-    setEventId('');
+    setEventId(defaultEventId ?? '');
     setCategory('');
     setPurpose('');
     setFinalApproverId('');
@@ -64,7 +65,7 @@ export function RequestFormModal({ open, onClose, onCreated }: Props) {
         if (!data) return;
         setPresidentAvailability(committeeEffectiveAvailability(data) === 'On Leave' ? 'On Leave' : 'Available');
       });
-  }, [open]);
+  }, [open, defaultEventId]);
 
   const updateLine = (index: number, patch: Partial<DraftLine>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));

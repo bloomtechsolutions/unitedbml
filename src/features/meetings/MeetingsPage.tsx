@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { useCommitteeMembers } from '../events/useEvents';
@@ -45,6 +46,13 @@ export function MeetingsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<MeetingRow | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (openId) setWorkspaceId(openId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const enriched = useMemo(
     () => meetings.map((meeting) => ({ meeting, status: meetingStatus(meeting) })),
