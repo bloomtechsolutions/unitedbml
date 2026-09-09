@@ -51,6 +51,7 @@ export function MeetingsPage() {
   useEffect(() => {
     const openId = searchParams.get('open');
     if (openId) setWorkspaceId(openId);
+    if (searchParams.get('new') === '1') setFormOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

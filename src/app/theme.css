@@ -197,6 +197,8 @@
 .ub-kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
 .ub-kpi-label { font-size: 13.5px; color: var(--ub-ink-faint); margin-top: 10px; }
 
+.ub-menu-item:hover { background: var(--ub-surface-2); }
+
 /* Buttons */
 .ub-btn {
   display: inline-flex;

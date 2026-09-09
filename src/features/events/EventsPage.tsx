@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useToast } from '../../lib/ToastContext';
 import type { EventRow } from '../../types/database';
 import { useEventFinanceSummary } from '../finance/useFinance';
@@ -29,6 +30,12 @@ export function EventsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventRow | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') setFormOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const enriched = useMemo(
     () =>
