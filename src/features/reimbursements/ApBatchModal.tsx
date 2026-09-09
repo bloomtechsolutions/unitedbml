@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/AuthContext';
 import type { ApBillRow, VendorMasterRow } from '../../types/database';
 import { ATTACHMENT_MODES } from './types';
 import type { ApBatchWithBills, AttachmentMode, ProcurementGroupCase } from './types';
@@ -85,11 +86,13 @@ interface Props {
 }
 
 export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSaved }: Props) {
+  const { profile } = useAuth();
   const [bills, setBills] = useState<DraftBill[]>([emptyBill()]);
   const [apEmail, setApEmail] = useState('');
   const [attachmentMode, setAttachmentMode] = useState<AttachmentMode>('Combined');
   const [combinedFile, setCombinedFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sendProgress, setSendProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -124,6 +127,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
     }
     setSaving(true);
     setError(null);
+    setSendProgress(send ? 'Saving bills…' : null);
     try {
       const batchId = await saveApBatchDraft(
         existingBatch?.id ?? null,
@@ -154,10 +158,16 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
       }
 
       if (send) {
+        setSendProgress('Preparing attachments and sending to Accounts Payable…');
         const { data: freshBatch } = await supabase.from('ap_batches').select('*').eq('id', batchId).single();
         const { data: freshBills } = await supabase.from('ap_bills').select('*').eq('ap_batch_id', batchId);
         if (freshBatch) {
-          await sendApBatch({ ...freshBatch, bills: freshBills ?? [] }, attachmentMode);
+          await sendApBatch(
+            { ...freshBatch, bills: freshBills ?? [] },
+            caseItem,
+            attachmentMode,
+            profile?.full_name || profile?.email || 'Unknown'
+          );
         }
       }
 
@@ -167,6 +177,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
       setError(err instanceof Error ? err.message : 'Failed to save AP batch.');
     } finally {
       setSaving(false);
+      setSendProgress(null);
     }
   };
 
@@ -248,6 +259,9 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         )}
       </div>
 
+      {sendProgress && (
+        <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--ub-accent-dark, #1d4ed8)' }}>{sendProgress}</div>
+      )}
       {error && <div style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>{error}</div>}
       <div className="modal-actions">
         <button className="btn ghost" onClick={onClose} disabled={saving}>
@@ -257,7 +271,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
           Save Draft
         </button>
         <button className="btn primary" onClick={() => void handleSaveDraft(true)} disabled={saving}>
-          {saving ? 'Sending…' : 'Save & Send to AP'}
+          {saving ? 'Sending…' : 'Send AP Email + Attachments'}
         </button>
       </div>
     </Modal>

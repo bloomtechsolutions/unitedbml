@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../lib/AuthContext';
 import type { EligibleExpenseRequest } from './types';
-import { createProcurementGroup } from './useReimbursements';
+import { createProcurementGroup, sendProcurementGroupEmail } from './useReimbursements';
 
 interface Props {
   request: EligibleExpenseRequest | null;
@@ -30,8 +30,19 @@ export function ProcurementGroupModal({ request, onClose, onCreated }: Props) {
     }
     setSaving(true);
     setError(null);
+    const actorName = profile?.full_name || profile?.email || 'Unknown';
     try {
-      await createProcurementGroup(request, managerEmail.trim(), headEmail.trim(), profile?.full_name || profile?.email || 'Unknown');
+      const group = await createProcurementGroup(request, managerEmail.trim(), headEmail.trim(), actorName);
+      try {
+        await sendProcurementGroupEmail(group, actorName, profile?.role || '', profile?.email || '');
+      } catch (emailErr) {
+        setError(
+          `The pre-approval was saved, but the email could not be sent: ${emailErr instanceof Error ? emailErr.message : 'Unknown error'}. You can retry sending from the Procurement tab.`
+        );
+        setSaving(false);
+        await onCreated();
+        return;
+      }
       await onCreated();
       onClose();
     } catch (err) {

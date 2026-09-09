@@ -5,7 +5,7 @@ import { Modal } from '../../components/Modal';
 import { useAuth } from '../../lib/AuthContext';
 import { AP_BATCH_STATUSES } from './types';
 import type { ApBatchWithBills } from './types';
-import { updateApBatchStatus } from './useReimbursements';
+import { batchHistory, updateApBatchStatus } from './useReimbursements';
 
 interface Props {
   batch: ApBatchWithBills | null;
@@ -67,6 +67,23 @@ export function ApStatusModal({ batch, onClose, onSaved }: Props) {
         </div>
       </div>
       {GUIDANCE[status] && <p style={{ fontSize: 12, color: 'var(--muted)' }}>{GUIDANCE[status]}</p>}
+
+      {batchHistory(batch).length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Status History</div>
+          <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+            {[...batchHistory(batch)]
+              .reverse()
+              .map((h, i) => (
+                <div key={i} style={{ fontSize: 11.5, color: 'var(--muted)', padding: '4px 0', borderBottom: '1px solid var(--line, #eee)' }}>
+                  <b>{h.status}</b> — {new Date(h.at).toLocaleString()}
+                  {h.actorName ? ` · ${h.actorName}` : ''}
+                  {h.remarks ? ` · ${h.remarks}` : ''}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
       {error && <div style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>{error}</div>}
       <div className="modal-actions">
         <button className="btn ghost" onClick={onClose} disabled={saving}>

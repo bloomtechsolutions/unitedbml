@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { decideExternalReimbursement, usePendingExternalReimbursements } from '../portal/usePortal';
 import { ApBatchModal } from './ApBatchModal';
@@ -9,11 +10,12 @@ import { ExceptionModal } from './ExceptionModal';
 import { ProcurementGroupModal } from './ProcurementGroupModal';
 import { ProcurementResponseModal } from './ProcurementResponseModal';
 import type { ApBatchWithBills, EligibleExpenseLine, EligibleExpenseRequest, ProcurementGroupCase } from './types';
-import { apSubmittedTotal, useEligibleExpenseRequests, useReimbursementCases } from './useReimbursements';
+import { apSubmittedTotal, sendProcurementGroupEmail, useEligibleExpenseRequests, useReimbursementCases } from './useReimbursements';
 
 type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'external';
 
 export function ReimbursementsPage() {
+  const { profile } = useAuth();
   const { cases, batches, loading, error, reload } = useReimbursementCases();
   const { eligible, loading: eligibleLoading } = useEligibleExpenseRequests(cases);
   const { items: pendingExternal, loading: externalLoading, reload: reloadExternal } = usePendingExternalReimbursements();
@@ -21,6 +23,7 @@ export function ReimbursementsPage() {
 
   const [subTab, setSubTab] = useState<SubTab>('cases');
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [groupTarget, setGroupTarget] = useState<EligibleExpenseRequest | null>(null);
   const [exceptionTarget, setExceptionTarget] = useState<EligibleExpenseLine | null>(null);
   const [respondingGroup, setRespondingGroup] = useState<ProcurementGroupCase | null>(null);
@@ -38,6 +41,19 @@ export function ReimbursementsPage() {
 
   const refresh = async () => {
     await reload();
+  };
+
+  const resendProcurementEmail = async (group: ProcurementGroupCase) => {
+    setResendingId(group.id);
+    try {
+      await sendProcurementGroupEmail(group, profile?.full_name || profile?.email || 'Unknown', profile?.role || '', profile?.email || '');
+      toast('Procurement pre-approval email sent');
+      await refresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to send email.');
+    } finally {
+      setResendingId(null);
+    }
   };
 
   const decideExternal = async (id: string, approve: boolean) => {
@@ -223,11 +239,25 @@ export function ReimbursementsPage() {
                   </li>
                 ))}
               </ul>
-              {g.status === 'Awaiting Procurement Response' && (
-                <button className="btn primary" onClick={() => setRespondingGroup(g)}>
-                  Record Procurement Response
-                </button>
+              {g.email_sent_at ? (
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+                  Emailed to {g.procurement_manager_email} on {new Date(g.email_sent_at).toLocaleString()}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--danger)', marginBottom: 8 }}>Email not yet sent to Procurement.</div>
               )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!g.email_sent_at && (
+                  <button className="btn ghost" disabled={resendingId === g.id} onClick={() => void resendProcurementEmail(g)}>
+                    {resendingId === g.id ? 'Sending…' : 'Send Email'}
+                  </button>
+                )}
+                {g.status === 'Awaiting Procurement Response' && (
+                  <button className="btn primary" onClick={() => setRespondingGroup(g)}>
+                    Record Procurement Response
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           {!groups.length && <p style={{ color: 'var(--muted)' }}>No Procurement pre-approvals yet.</p>}

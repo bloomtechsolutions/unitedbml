@@ -16,6 +16,12 @@ import type {
   ProcurementGroupCase,
 } from './types';
 import { apBillEvidencePath, procurementEvidencePath, uploadEvidence } from './storage';
+import { downloadAsAttachment, outlookEmailTemplate, sendEmail, type EmailAttachment } from '../../lib/email';
+import { generateApprovedExpenseNotePdf } from '../../lib/expenseNotePdf';
+
+const EVIDENCE_BUCKET = 'reimbursement-evidence';
+const MAX_EVIDENCE_BYTES = 15 * 1024 * 1024;
+const STALE_LOCK_MS = 2 * 60 * 1000;
 
 function assembleCases(cases: ReimbursementCaseRow[]): ProcurementGroupCase[] {
   return cases.map((c) => ({ ...c, items: ((c.data?.items as GroupItem[] | undefined) ?? []) }));
@@ -118,7 +124,8 @@ export async function createProcurementGroup(
   const id = crypto.randomUUID();
   const ref = `PRC-${Date.now().toString(36).toUpperCase()}`;
   const totalAmount = request.lines.reduce((sum, l) => sum + l.amount, 0);
-  const { error } = await supabase.from('reimbursement_cases').insert({
+  const items: GroupItem[] = request.lines.map((l) => ({ lineNo: l.lineNo, description: l.description, amount: l.amount }));
+  const row: Partial<ReimbursementCaseRow> = {
     id,
     case_ref: ref,
     expense_request_id: request.expenseRequestId,
@@ -132,24 +139,81 @@ export async function createProcurementGroup(
     requested_by: requestedBy,
     procurement_manager_email: managerEmail,
     procurement_head_email: headEmail,
-    email_reference: ref,
-    email_prepared_at: new Date().toISOString(),
-    data: {
-      isProcurementGroup: true,
-      items: request.lines.map((l) => ({ lineNo: l.lineNo, description: l.description, amount: l.amount })),
-    },
-  } satisfies Partial<ReimbursementCaseRow>);
+    data: { isProcurementGroup: true, items },
+  };
+  const { error } = await supabase.from('reimbursement_cases').insert(row);
   if (error) throw error;
-  return id;
+  return { ...row, items } as ProcurementGroupCase;
+}
+
+/** Sends the grouped Procurement pre-approval email (V12.9.7/V12.9.8) with the Approved
+ * Expense Approval Note PDF attached, and records the send on the case for audit/inheritance. */
+export async function sendProcurementGroupEmail(group: ProcurementGroupCase, actorName: string, actorRole: string, actorEmail: string) {
+  if (!group.procurement_manager_email) throw new Error('A Procurement Manager email is required before sending.');
+
+  const total = group.approved_item_amount;
+  const advisory =
+    group.items.length > 1 || total > 10000 ? 'Please note that any single reimbursement will not exceed MVR 10,000.' : undefined;
+  const subject = `Procurement Pre-Approval Required: ${group.case_ref} - ${group.expense_request_number ?? ''}`.trim();
+
+  const note = await generateApprovedExpenseNotePdf(group.expense_request_id!);
+
+  const html = outlookEmailTemplate({
+    heading: 'Reimbursement Pre-Approval Request',
+    intro: 'Dear Sir, please review the following reimbursement pre-approval request and place it for your approval to proceed.',
+    rows: [
+      { label: 'Expense Request', value: `${group.expense_request_number ?? ''}` },
+      { label: 'Event / Activity', value: group.event_name || 'General (no linked event)' },
+    ],
+    itemsTable: {
+      headers: ['Expense Item', 'Amount (MVR)'],
+      rows: group.items.map((i) => [i.description, i.amount.toLocaleString()]),
+    },
+    totalLabel: 'Total Amount',
+    totalValue: `MVR ${total.toLocaleString()}`,
+    advisory,
+    signatureName: actorName,
+    signatureRole: actorRole,
+    signatureEmail: actorEmail,
+  });
+
+  await sendEmail({
+    to: group.procurement_manager_email,
+    cc: group.procurement_head_email || undefined,
+    subject,
+    html,
+    attachments: [note],
+    emailType: 'Procurement Pre-Approval',
+    relatedType: 'reimbursement_case',
+    relatedId: group.id,
+  });
+
+  const { error } = await supabase
+    .from('reimbursement_cases')
+    .update({ email_reference: subject, email_sent_at: new Date().toISOString(), email_attachment_name: note.filename })
+    .eq('id', group.id);
+  if (error) throw error;
+
+  await supabase.from('reimbursement_history').insert({
+    reimbursement_id: group.id,
+    action: 'procurement_email_sent',
+    status: group.status,
+    remarks: `Sent to ${group.procurement_manager_email}${group.procurement_head_email ? `, cc ${group.procurement_head_email}` : ''}`,
+    actor_name: actorName,
+  });
 }
 
 export async function recordProcurementResponse(
   group: ProcurementGroupCase,
   decision: 'Approved' | 'Rejected',
-  comment: string,
-  respondedBy: string,
+  responseDate: string,
   evidenceFile: File | null
 ) {
+  if (evidenceFile && evidenceFile.size > MAX_EVIDENCE_BYTES) {
+    throw new Error('Evidence file must be 15 MB or smaller.');
+  }
+  const respondedBy = [group.procurement_manager_email, group.procurement_head_email].filter(Boolean).join('; ') || 'Procurement';
+
   let evidencePath: string | null = null;
   if (evidenceFile) {
     evidencePath = procurementEvidencePath(group.id, evidenceFile.name);
@@ -160,9 +224,8 @@ export async function recordProcurementResponse(
     .from('reimbursement_cases')
     .update({
       status: decision,
-      procurement_comment: comment || null,
       procurement_response_by: respondedBy,
-      procurement_response_date: new Date().toISOString().slice(0, 10),
+      procurement_response_date: responseDate || new Date().toISOString().slice(0, 10),
       data: { ...group.data, evidencePath: evidencePath ?? (group.data as { evidencePath?: string }).evidencePath },
     })
     .eq('id', group.id);
@@ -172,7 +235,6 @@ export async function recordProcurementResponse(
     reimbursement_id: group.id,
     action: 'procurement_response',
     status: decision,
-    remarks: comment || null,
     actor_name: respondedBy,
   });
 
@@ -194,9 +256,8 @@ export async function recordProcurementResponse(
         requested_by: group.requested_by,
         procurement_manager_email: group.procurement_manager_email,
         procurement_head_email: group.procurement_head_email,
-        procurement_comment: comment || null,
         procurement_response_by: respondedBy,
-        procurement_response_date: new Date().toISOString().slice(0, 10),
+        procurement_response_date: responseDate || new Date().toISOString().slice(0, 10),
         data: { groupId: group.id, evidencePath },
       } satisfies Partial<ReimbursementCaseRow>);
       if (lineError) throw lineError;
@@ -292,13 +353,32 @@ export async function uploadBatchAttachment(batchId: string, mode: AttachmentMod
   return path;
 }
 
-export async function sendApBatch(batch: ApBatchWithBills, attachmentMode: AttachmentMode) {
-  // Single-send protection: re-check the current status right before flipping it, so a
-  // duplicate/racing click on a stale in-memory batch can't send twice.
-  const { data: current, error: fetchError } = await supabase.from('ap_batches').select('status').eq('id', batch.id).single();
+export interface ApBatchHistoryEntry {
+  at: string;
+  status: string;
+  remarks?: string;
+  actorName?: string;
+}
+
+function batchHistory(batch: Pick<ApBatchRow, 'data'>): ApBatchHistoryEntry[] {
+  return (batch.data?.history as ApBatchHistoryEntry[] | undefined) ?? [];
+}
+
+export { batchHistory };
+
+/** Sends the AP submission email — Send AP Email + Attachments (V12.9.10/V12.10.3) — bundling the
+ * Approved Expense Approval Note, inherited Procurement response evidence, and the bills, with a
+ * persistent single-send lock so a duplicate click while the (potentially slow) send is in flight
+ * can't fire the email twice. */
+export async function sendApBatch(batch: ApBatchWithBills, caseItem: ProcurementGroupCase, attachmentMode: AttachmentMode, actorName: string) {
+  const { data: current, error: fetchError } = await supabase.from('ap_batches').select('status,data,sent_at').eq('id', batch.id).single();
   if (fetchError) throw fetchError;
-  if (current.status !== 'Draft') {
+  if (current.status !== 'Draft' || current.sent_at) {
     throw new Error('This batch has already been sent.');
+  }
+  const lock = current.data?.emailSendingAt as string | undefined;
+  if (lock && Date.now() - new Date(lock).getTime() < STALE_LOCK_MS) {
+    throw new Error('A send is already in progress for this batch. Please wait a moment and try again.');
   }
   if (!batch.ap_email) throw new Error('An AP email address is required before sending.');
   if (!batch.bills.length) throw new Error('Add at least one bill before sending.');
@@ -314,24 +394,99 @@ export async function sendApBatch(batch: ApBatchWithBills, attachmentMode: Attac
     throw new Error('Upload a combined bills attachment before sending.');
   }
 
-  const { error } = await supabase
-    .from('ap_batches')
-    .update({ status: 'Sent to AP', sent_at: new Date().toISOString() })
-    .eq('id', batch.id);
-  if (error) throw error;
+  const attemptId = crypto.randomUUID();
+  const lockedData = { ...current.data, emailSendingAt: new Date().toISOString(), emailSendingBy: actorName, emailSendAttemptId: attemptId };
+  const { error: lockError } = await supabase.from('ap_batches').update({ data: lockedData }).eq('id', batch.id);
+  if (lockError) throw lockError;
 
-  await supabase.from('reimbursement_history').insert({
-    reimbursement_id: batch.reimbursement_id,
-    action: 'ap_batch_sent',
-    status: 'Sent to AP',
-    remarks: `Batch ${batch.submission_ref} sent to ${batch.ap_email}`,
-  });
+  try {
+    const attachments: EmailAttachment[] = [];
+    if (caseItem.expense_request_id) {
+      attachments.push(await generateApprovedExpenseNotePdf(caseItem.expense_request_id));
+    }
+    const evidencePath = (caseItem.data as { evidencePath?: string } | null)?.evidencePath;
+    if (evidencePath) {
+      const name = evidencePath.split('/').pop() || 'procurement-response';
+      attachments.push(await downloadAsAttachment(EVIDENCE_BUCKET, evidencePath, name, ''));
+    }
+    if (attachmentMode === 'Combined' && batch.bills_attachment_path) {
+      attachments.push(
+        await downloadAsAttachment(EVIDENCE_BUCKET, batch.bills_attachment_path, batch.bills_attachment_name || 'bills', batch.bills_attachment_type || '')
+      );
+    } else {
+      for (const bill of batch.bills) {
+        const path = (bill.data as { attachmentPath?: string } | null)?.attachmentPath;
+        const name = (bill.data as { attachmentName?: string } | null)?.attachmentName;
+        if (path) attachments.push(await downloadAsAttachment(EVIDENCE_BUCKET, path, name || 'bill', ''));
+      }
+    }
+
+    const html = outlookEmailTemplate({
+      heading: 'Accounts Payable Submission',
+      intro: `Please find attached the approved bill(s) for ${caseItem.expense_item} for processing and payment.`,
+      rows: [
+        { label: 'Submission Reference', value: batch.submission_ref ?? '' },
+        { label: 'Reimbursement Case', value: caseItem.case_ref ?? '' },
+        { label: 'Event / Activity', value: caseItem.event_name || 'General (no linked event)' },
+      ],
+      itemsTable: {
+        headers: ['Vendor', 'Bill Date', 'Amount (MVR)'],
+        rows: batch.bills.map((b) => [b.vendor_name ?? '', b.bill_date ?? '', Number(b.amount ?? 0).toLocaleString()]),
+      },
+      totalLabel: 'Total Amount',
+      totalValue: `MVR ${batch.bills.reduce((s, b) => s + Number(b.amount ?? 0), 0).toLocaleString()}`,
+      signatureName: actorName,
+      signatureRole: 'Treasurer',
+      signatureEmail: '',
+    });
+
+    const result = await sendEmail({
+      to: batch.ap_email,
+      subject: `AP Submission: ${batch.submission_ref} - ${caseItem.expense_item}`,
+      html,
+      attachments,
+      emailType: 'AP Submission',
+      relatedType: 'ap_batch',
+      relatedId: batch.id,
+    });
+
+    const { error } = await supabase
+      .from('ap_batches')
+      .update({
+        status: 'Sent to AP',
+        sent_at: new Date().toISOString(),
+        data: {
+          ...lockedData,
+          emailSendingAt: null,
+          emailSendingBy: null,
+          providerMessageId: result.messageId,
+          history: [...batchHistory({ data: lockedData }), { at: new Date().toISOString(), status: 'Sent to AP', actorName, remarks: `Sent to ${batch.ap_email}` }],
+        },
+      })
+      .eq('id', batch.id);
+    if (error) throw error;
+
+    await supabase.from('reimbursement_history').insert({
+      reimbursement_id: batch.reimbursement_id,
+      action: 'ap_batch_sent',
+      status: 'Sent to AP',
+      remarks: `Batch ${batch.submission_ref} sent to ${batch.ap_email}`,
+      actor_name: actorName,
+    });
+  } catch (err) {
+    await supabase
+      .from('ap_batches')
+      .update({ data: { ...lockedData, emailSendingAt: null, emailSendingBy: null } })
+      .eq('id', batch.id);
+    throw err;
+  }
 }
 
 export async function updateApBatchStatus(batch: ApBatchWithBills, status: string, remarks: string, actorName: string) {
+  const history = [...batchHistory(batch), { at: new Date().toISOString(), status, remarks: remarks || undefined, actorName }];
   const { error } = await supabase
     .from('ap_batches')
-    .update({ status, status_date: new Date().toISOString().slice(0, 10), status_remarks: remarks || null })
+    .update({ status, status_date: new Date().toISOString().slice(0, 10), status_remarks: remarks || null, data: { ...batch.data, history } })
     .eq('id', batch.id);
   if (error) throw error;
   await supabase.from('reimbursement_history').insert({
