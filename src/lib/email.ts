@@ -34,7 +34,7 @@ function toRecipientList(value: string | string[] | undefined): string[] {
  * access back into Supabase.
  */
 export async function sendEmail(payload: SendEmailPayload) {
-  const webhookUrl = process.env.NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL;
+  const webhookUrl = process.env.NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL?.trim();
   if (!webhookUrl) {
     throw new Error('Email sending is not configured — set NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL to the Power Automate Flow URL.');
   }
