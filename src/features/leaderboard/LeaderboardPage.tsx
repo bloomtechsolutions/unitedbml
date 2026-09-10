@@ -7,7 +7,7 @@ import { useLeaderboard } from './useLeaderboard';
 
 const LEVEL_CLASS: Record<string, string> = { Starter: '', Bronze: 'bronze', Silver: 'silver', Gold: 'gold' };
 const MEDAL = ['🥇', '🥈', '🥉'];
-const ACTIVITY_ICON: Record<string, string> = { event: '◉', task: '✓', tournament: '🏆', win: '★' };
+const ACTIVITY_ICON: Record<string, string> = { event: '◉', task: '✓', win: '★' };
 
 function initials(name: string): string {
   return name
@@ -32,7 +32,7 @@ export function LeaderboardPage() {
 
   const sorted = useMemo(() => {
     return rows
-      .filter((r) => r.points > 0 || r.events > 0 || r.tournaments > 0 || r.tasks > 0)
+      .filter((r) => r.points > 0 || r.events > 0 || r.wins > 0 || r.tasks > 0)
       .filter((r) => {
         const matchesSearch =
           !search ||
@@ -61,7 +61,7 @@ export function LeaderboardPage() {
         <div>
           <div className="leaderboard-kicker">UNITEDBML</div>
           <h2>Leaderboard</h2>
-          <p>Recognizing event participation, tournament achievements, and task delivery.</p>
+          <p>Recognizing event attendance, achievements, and task delivery — tracked by committee.</p>
         </div>
       </div>
 
@@ -133,7 +133,6 @@ export function LeaderboardPage() {
                     </div>
                     <div className="leaderboard-podium-meta">
                       <span>{row.events} events</span>
-                      <span>{row.tournaments} tournaments</span>
                       <span>{row.wins} wins</span>
                     </div>
                   </div>
@@ -179,8 +178,8 @@ export function LeaderboardPage() {
                     <small>Events</small>
                   </div>
                   <div className="leaderboard-count">
-                    <b>{row.tournaments}</b>
-                    <small>Tournaments</small>
+                    <b>{row.wins}</b>
+                    <small>Achievements</small>
                   </div>
                   <div className="leaderboard-points">
                     <b>{row.points}</b>
@@ -222,10 +221,6 @@ function LeaderboardDetail({ row }: { row: LeaderboardRow }) {
         <div>
           <b>{row.events}</b>
           <span>Events</span>
-        </div>
-        <div>
-          <b>{row.tournaments}</b>
-          <span>Tournaments</span>
         </div>
         <div>
           <b>{row.tasks}</b>

@@ -1,24 +1,16 @@
-import type {
-  EventRegistrationRow,
-  EventRow,
-  EventTeamRow,
-  EventWinnerRow,
-  ExternalEventOfficialRow,
-} from '../../types/database';
+import type { EventTaskRow, ExternalEventOfficialRow } from '../../types/database';
 
-export interface PortalEvent extends EventRow {
-  teams: EventTeamRow[];
-  registrations: EventRegistrationRow[];
-  winners: EventWinnerRow[];
-  myRegistration: EventRegistrationRow | null;
+export interface MyTaskItem extends EventTaskRow {
+  eventName: string;
 }
 
-export interface MyEngagement {
-  registrations: number;
-  attendances: number;
-  achievements: number;
-  points: number;
-  level: 'Starter' | 'Bronze' | 'Silver' | 'Gold';
+export interface MyApprovalItem {
+  id: string;
+  title: string | null;
+  request_number: string | null;
+  status: string;
+  total_amount: number;
+  stage: 'President Recommendation' | 'Final Approval';
 }
 
 export interface OfficialAssignment extends ExternalEventOfficialRow {

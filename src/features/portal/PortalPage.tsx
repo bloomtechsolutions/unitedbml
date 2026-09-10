@@ -1,465 +1,270 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
-import { EventPortalSettingsModal } from './EventPortalSettingsModal';
+import { checkInToMeeting } from '../meetings/useMeetings';
+import { useMyMeetings } from '../dashboard/useMyMeetings';
+import { leaderboardLevel } from '../leaderboard/types';
+import { useLeaderboard } from '../leaderboard/useLeaderboard';
 import { ReimbursementFormModal } from './ReimbursementFormModal';
-import { TeamDetailModal } from './TeamDetailModal';
-import type { PortalEvent } from './types';
 import {
-  computeEngagement,
-  createEventTeam,
-  decideEventTeamJoin,
-  requestJoinEventTeam,
-  selfRegisterEvent,
-  useEventAttendanceAll,
+  useMyCommitteeId,
   useMyExternalReimbursements,
   useMyOfficialAssignments,
-  usePendingExternalReimbursements,
-  usePortalEvents,
+  useMyOpenTasks,
+  useMyPendingApprovals,
 } from './usePortal';
 
-type SubTab = 'hub' | 'activities' | 'registrations' | 'engagement' | 'reimbursements' | 'team-requests';
-
-function registrationStatusText(event: PortalEvent): string {
-  if (!event.registration_enabled) return 'Registration not open';
-  const now = new Date();
-  if (event.registration_open_at && now < new Date(event.registration_open_at)) return 'Registration has not opened yet';
-  if (event.registration_close_at && now > new Date(event.registration_close_at)) return 'Registration is closed';
-  return '';
+function normalize(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase();
 }
 
 export function PortalPage() {
-  const { profile, isCommitteeUser } = useAuth();
+  const { profile, session } = useAuth();
   const toast = useToast();
-  const { events, loading, error, reload } = usePortalEvents(profile?.id);
-  const attendance = useEventAttendanceAll();
+  const committeeId = useMyCommitteeId(session?.user.id);
+  const { tasks: myTasks, loading: tasksLoading } = useMyOpenTasks(committeeId);
+  const { items: myApprovals, loading: approvalsLoading } = useMyPendingApprovals(profile);
+  const { summaries: myMeetings, loading: meetingsLoading, reload: reloadMeetings } = useMyMeetings(session?.user.id);
+  const { rows: leaderboardRows, loading: leaderboardLoading } = useLeaderboard();
   const { assignments } = useMyOfficialAssignments(profile?.id);
   const { items: myReimbursements, reload: reloadMyReimbursements } = useMyExternalReimbursements(profile?.id);
-  const { items: pendingReimbursements } = usePendingExternalReimbursements();
-
-  const [subTab, setSubTab] = useState<SubTab>('hub');
-  const [teamTarget, setTeamTarget] = useState<{ event: PortalEvent; teamId: string } | null>(null);
-  const [settingsTarget, setSettingsTarget] = useState<PortalEvent | null>(null);
+  const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [reimbModalOpen, setReimbModalOpen] = useState(false);
-  const [newTeamName, setNewTeamName] = useState<Record<string, string>>({});
-  const [decidingId, setDecidingId] = useState<string | null>(null);
-  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
-  const searchParams = useSearchParams();
 
-  const registrable = events.filter((e) => e.registration_enabled);
-  const myRegistrations = events.filter((e) => e.myRegistration);
-  const engagement = computeEngagement(profile, events, attendance);
+  const sortedLeaderboard = [...leaderboardRows].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  const myKey = normalize(profile?.member_uid) ? `uid:${normalize(profile?.member_uid)}` : normalize(profile?.email) ? `email:${normalize(profile?.email)}` : `name:${normalize(profile?.full_name)}`;
+  const myRow = sortedLeaderboard.find((r) => r.key === myKey || normalize(r.name) === normalize(profile?.full_name)) ?? null;
+  const myRank = myRow ? sortedLeaderboard.indexOf(myRow) + 1 : null;
+  const { level, next, floor, ceiling } = leaderboardLevel(myRow?.points ?? 0);
+  const progressPct = ceiling ? Math.min(100, (((myRow?.points ?? 0) - floor) / (ceiling - floor)) * 100) : 100;
 
-  const pendingTeamJoins = events.flatMap((e) =>
-    e.registrations.filter((r) => r.status === 'Pending Leader Approval').map((r) => ({ event: e, registration: r }))
-  );
+  const today = new Date().toISOString().slice(0, 10);
 
-  const refresh = async () => {
-    await reload();
-  };
-
-  // QR / deep-link team join: a shared link like /portal?team=<teamId> (optionally with
-  // ?event=<eventId>) auto-processes the join request the moment the portal loads, then opens
-  // the team so the member can see it was sent.
-  useEffect(() => {
-    if (deepLinkHandled || loading || !events.length) return;
-    const teamId = searchParams.get('team');
-    const eventId = searchParams.get('event') || searchParams.get('joinEvent');
-    if (!teamId && !eventId) return;
-    setDeepLinkHandled(true);
-    setSubTab('activities');
-
-    if (teamId) {
-      const event = events.find((e) => e.teams.some((t) => t.id === teamId));
-      if (!event) return;
-      const alreadyIn = event.registrations.some((r) => r.team_id === teamId && r.user_id === profile?.id);
-      if (!alreadyIn) {
-        void requestJoinEventTeam(teamId)
-          .then(() => {
-            toast('Join request sent to the team leader');
-            return refresh();
-          })
-          .catch((err) => toast(err instanceof Error ? err.message : 'Failed to request join.'))
-          .finally(() => setTeamTarget({ event, teamId }));
-      } else {
-        setTeamTarget({ event, teamId });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, loading, deepLinkHandled]);
-
-  const handleDecideTeamJoin = async (registrationId: string, approve: boolean) => {
-    setDecidingId(registrationId);
+  const handleCheckIn = async (meetingId: string) => {
+    setCheckingInId(meetingId);
     try {
-      await decideEventTeamJoin(registrationId, approve);
-      toast(approve ? 'Join request approved' : 'Join request rejected');
-      await refresh();
+      await checkInToMeeting(meetingId);
+      await reloadMeetings();
+      toast("You're checked in");
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to decide join request.');
+      toast(err instanceof Error ? err.message : 'Failed to check in.');
     } finally {
-      setDecidingId(null);
+      setCheckingInId(null);
     }
   };
-
-  const handleSelfRegister = async (eventId: string) => {
-    try {
-      await selfRegisterEvent(eventId, 'Individual');
-      toast('Registered');
-      await refresh();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to register.');
-    }
-  };
-
-  const handleCreateTeam = async (eventId: string) => {
-    const name = (newTeamName[eventId] || '').trim();
-    if (!name) {
-      toast('Enter a team name first.');
-      return;
-    }
-    try {
-      await createEventTeam(eventId, name);
-      setNewTeamName((v) => ({ ...v, [eventId]: '' }));
-      toast('Team created');
-      await refresh();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to create team.');
-    }
-  };
-
-  const handleJoinTeam = async (teamId: string) => {
-    try {
-      await requestJoinEventTeam(teamId);
-      toast('Join request sent to the team leader');
-      await refresh();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to request join.');
-    }
-  };
-
-  if (loading) return <div>Loading Participant Portal…</div>;
-  if (error) return <div style={{ color: 'var(--danger)' }}>Failed to load: {error}</div>;
 
   return (
     <div>
-      <div className="portal-hero">
-        <div>
-          <div className="portal-kicker">Participant Portal</div>
-          <h2>My Hub</h2>
-          <p>Register for activities, manage your teams, and track your reimbursements.</p>
-        </div>
+      <div
+        style={{
+          borderRadius: 16,
+          background: 'linear-gradient(120deg, var(--ub-ink), var(--ub-accent-dark))',
+          color: '#fff',
+          padding: '22px 26px',
+          marginBottom: 18,
+        }}
+      >
+        <div style={{ fontSize: 12.5, opacity: 0.85 }}>MY HUB</div>
+        <h2 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0' }}>Welcome{profile?.full_name ? `, ${profile.full_name}` : ''}</h2>
+        <p style={{ fontSize: 13.5, opacity: 0.9 }}>Your tasks, approvals, meetings and standing — in one place.</p>
       </div>
 
-      <div className="tabs">
-        <button className={`tab ${subTab === 'hub' ? 'active' : ''}`} onClick={() => setSubTab('hub')}>
-          My Hub
-        </button>
-        <button className={`tab ${subTab === 'activities' ? 'active' : ''}`} onClick={() => setSubTab('activities')}>
-          Activities ({registrable.length})
-        </button>
-        <button className={`tab ${subTab === 'registrations' ? 'active' : ''}`} onClick={() => setSubTab('registrations')}>
-          My Registrations ({myRegistrations.length})
-        </button>
-        <button className={`tab ${subTab === 'engagement' ? 'active' : ''}`} onClick={() => setSubTab('engagement')}>
-          My Engagement
-        </button>
-        {assignments.length > 0 && (
-          <button className={`tab ${subTab === 'reimbursements' ? 'active' : ''}`} onClick={() => setSubTab('reimbursements')}>
-            My Reimbursements ({myReimbursements.length})
-          </button>
-        )}
-        {isCommitteeUser && (
-          <button className={`tab ${subTab === 'team-requests' ? 'active' : ''}`} onClick={() => setSubTab('team-requests')}>
-            Team Requests ({pendingTeamJoins.length})
-          </button>
-        )}
-      </div>
-
-      {subTab === 'hub' && (
-        <div className="portal-grid">
-          <div className="portal-card">
-            <div className="portal-card-head">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div className="ub-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div>
-                <h3>Upcoming Activities</h3>
-                <p>Open for registration</p>
+                <h3 style={{ fontSize: 15, fontWeight: 700 }}>My Open Tasks</h3>
+                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginTop: 2 }}>Event preparation tasks assigned to you.</p>
               </div>
-              <button className="portal-link" onClick={() => setSubTab('activities')}>
-                View all
-              </button>
+              <span className="ub-pill ub-pill-neutral">{myTasks.length}</span>
             </div>
-            {registrable.slice(0, 6).map((e) => (
-              <div className="portal-list-row" key={e.id}>
-                <div className="portal-date-badge">
-                  <b>{e.event_date ? new Date(e.event_date).getDate() : '—'}</b>
-                  <small>{e.event_date ? new Date(e.event_date).toLocaleString('en-US', { month: 'short' }) : ''}</small>
-                </div>
+            {!tasksLoading && !myTasks.length && <p className="ub-empty">No open tasks assigned to you.</p>}
+            {myTasks.map((t) => (
+              <Link
+                key={t.id}
+                href="/events"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 4px',
+                  borderBottom: '1px solid var(--ub-border-2)',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                }}
+              >
                 <div>
-                  <strong>{e.name}</strong>
-                  <small>{e.venue || 'Venue TBC'}</small>
+                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t.task_text}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>{t.eventName}</div>
                 </div>
-                <span className={`portal-status ${e.myRegistration ? 'approved' : 'pending'}`}>
-                  {e.myRegistration ? e.myRegistration.status : 'Open'}
+                <span className={`ub-pill ${t.due_date && t.due_date < today ? 'ub-pill-danger' : 'ub-pill-neutral'}`}>
+                  {t.due_date || 'No due date'}
                 </span>
-              </div>
+              </Link>
             ))}
-            {!registrable.length && <div style={{ fontSize: 12, color: 'var(--muted)' }}>No activities open for registration right now.</div>}
           </div>
-          <div className="portal-card">
-            <div className="portal-card-head">
+
+          <div className="ub-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div>
-                <h3>My Engagement</h3>
+                <h3 style={{ fontSize: 15, fontWeight: 700 }}>Pending My Approval</h3>
+                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginTop: 2 }}>Finance requests waiting on your decision.</p>
               </div>
+              <span className="ub-pill ub-pill-neutral">{myApprovals.length}</span>
             </div>
-            <div className="portal-metric">
-              <small>Level</small>
-              <b>{engagement.level}</b>
-              <span>{engagement.points} points</span>
-            </div>
-            {isCommitteeUser && pendingReimbursements.length > 0 && (
-              <div style={{ marginTop: 12, fontSize: 12 }}>
-                {pendingReimbursements.length} external reimbursement(s) awaiting Committee approval — see the
-                Reimbursements module.
+            {!approvalsLoading && !myApprovals.length && <p className="ub-empty">Nothing waiting on your decision.</p>}
+            {myApprovals.map((r) => (
+              <Link
+                key={r.id}
+                href="/finance"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 4px',
+                  borderBottom: '1px solid var(--ub-border-2)',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{r.title || r.request_number}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>{r.stage} · MVR {r.total_amount.toLocaleString()}</div>
+                </div>
+                <span className="ub-pill ub-pill-warning">{r.status}</span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="ub-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 700 }}>Upcoming Meetings</h3>
+                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginTop: 2 }}>Meetings you're invited to.</p>
               </div>
+              <span className="ub-pill ub-pill-neutral">{myMeetings.length}</span>
+            </div>
+            {!meetingsLoading && !myMeetings.length && <p className="ub-empty">No upcoming meetings.</p>}
+            {myMeetings.map((s) => {
+              const isToday = s.meeting.meeting_date === today;
+              const checkedIn = s.myAttendance?.attendance_status === 'Present';
+              return (
+                <div
+                  key={s.meeting.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '9px 4px',
+                    borderBottom: '1px solid var(--ub-border-2)',
+                  }}
+                >
+                  <Link href={`/meetings?open=${s.meeting.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{s.meeting.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>
+                      {s.meeting.meeting_date} · {s.meeting.meeting_time} · {s.meeting.location || 'Venue TBC'}
+                    </div>
+                  </Link>
+                  {isToday && !checkedIn && (
+                    <button
+                      className="ub-btn ub-btn-primary"
+                      style={{ padding: '6px 12px', fontSize: 12 }}
+                      disabled={checkingInId === s.meeting.id}
+                      onClick={() => void handleCheckIn(s.meeting.id)}
+                    >
+                      {checkingInId === s.meeting.id ? 'Checking in…' : 'Check In'}
+                    </button>
+                  )}
+                  {checkedIn && <span className="ub-pill ub-pill-success">✓ Checked in</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div className="ub-card">
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>My Standing</h3>
+            <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 14 }}>Your points on the Leaderboard.</p>
+            {leaderboardLoading && <p style={{ fontSize: 13, color: 'var(--ub-ink-faint)' }}>Loading…</p>}
+            {!leaderboardLoading && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 28, fontWeight: 700 }}>{myRow?.points ?? 0}</span>
+                  <span style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)' }}>points</span>
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', marginBottom: 12 }}>
+                  {myRank ? `Rank #${myRank} of ${sortedLeaderboard.length}` : 'Not yet ranked'} · {level}
+                </div>
+                <div style={{ height: 6, borderRadius: 99, background: 'var(--ub-surface-2)', overflow: 'hidden', marginBottom: 14 }}>
+                  <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--ub-accent)' }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{myRow?.events ?? 0}</div>
+                    <div style={{ color: 'var(--ub-ink-faint)' }}>Events Attended</div>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{myRow?.tasks ?? 0}</div>
+                    <div style={{ color: 'var(--ub-ink-faint)' }}>Tasks Completed</div>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{myRow?.wins ?? 0}</div>
+                    <div style={{ color: 'var(--ub-ink-faint)' }}>Achievements</div>
+                  </div>
+                  {next !== null && (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}>{next}</div>
+                      <div style={{ color: 'var(--ub-ink-faint)' }}>Points to next level</div>
+                    </div>
+                  )}
+                </div>
+                <Link href="/leaderboard" className="ub-btn ub-btn-ghost" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}>
+                  View Full Leaderboard
+                </Link>
+              </>
             )}
           </div>
-        </div>
-      )}
 
-      {subTab === 'activities' && (
-        <div className="portal-activity-grid">
-          {events.map((e) => {
-            const closedReason = registrationStatusText(e);
-            return (
-              <div className="portal-event-card" key={e.id}>
-                <div className="portal-event-top">
-                  <span className="portal-event-type">{e.event_type || 'Event'}</span>
-                  <span className="portal-event-status">{e.status}</span>
-                </div>
-                <h3>{e.name}</h3>
-                <div className="portal-event-meta">
-                  {e.event_date ? new Date(e.event_date).toLocaleDateString() : 'Date TBC'} · {e.venue || 'Venue TBC'}
-                </div>
-                {e.participant_rules && <div className="portal-event-desc">{e.participant_rules}</div>}
-
-                {e.registration_enabled && !closedReason && !e.myRegistration && e.registration_mode === 'Individual' && (
-                  <div className="portal-event-actions">
-                    <button className="btn primary" onClick={() => void handleSelfRegister(e.id)}>
-                      Register
-                    </button>
-                  </div>
-                )}
-
-                {e.registration_enabled && !closedReason && !e.myRegistration && e.registration_mode === 'Teams' && (
-                  <div className="portal-event-actions" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-                    <input
-                      placeholder="New team name"
-                      value={newTeamName[e.id] || ''}
-                      onChange={(ev) => setNewTeamName((v) => ({ ...v, [e.id]: ev.target.value }))}
-                    />
-                    <button className="btn primary" onClick={() => void handleCreateTeam(e.id)}>
-                      Create Team
-                    </button>
-                    {e.teams
-                      .filter((t) => t.status === 'Open')
-                      .map((t) => (
-                        <button key={t.id} className="btn ghost" onClick={() => void handleJoinTeam(t.id)}>
-                          Request to join {t.team_name}
-                        </button>
-                      ))}
-                  </div>
-                )}
-
-                {e.myRegistration && (
-                  <div className="portal-event-actions">
-                    <span className={`portal-status ${e.myRegistration.status === 'Approved' ? 'approved' : e.myRegistration.status === 'Rejected' ? 'rejected' : 'pending'}`}>
-                      {e.myRegistration.status}
-                    </span>
-                    {e.myRegistration.team_id && (
-                      <button className="btn ghost" onClick={() => setTeamTarget({ event: e, teamId: e.myRegistration!.team_id! })}>
-                        View Team
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {closedReason && !e.myRegistration && <div className="portal-registration-closed">{closedReason}</div>}
-
-                {isCommitteeUser && (
-                  <div className="portal-event-actions" style={{ marginTop: 8 }}>
-                    <button className="btn ghost" onClick={() => setSettingsTarget(e)}>
-                      Configure
-                    </button>
-                  </div>
-                )}
-
-                {e.winners.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    {e.winners.map((w) => (
-                      <div className="portal-winner" key={w.id}>
-                        <b>{w.position}</b>
-                        <span>{w.winner_name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {!events.length && <div style={{ fontSize: 12, color: 'var(--muted)' }}>No activities yet.</div>}
-        </div>
-      )}
-
-      {subTab === 'registrations' && (
-        <div>
-          {myRegistrations.map((e) => (
-            <div className="portal-registration-card" key={e.id}>
-              <div className="portal-reg-head">
+          {assignments.length > 0 && (
+            <div className="ub-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div>
-                  <h3>{e.name}</h3>
-                  <div className="portal-reg-meta">
-                    {e.myRegistration?.registration_type} · {e.event_date ? new Date(e.event_date).toLocaleDateString() : 'Date TBC'}
+                  <h3 style={{ fontSize: 15, fontWeight: 700 }}>My Reimbursements</h3>
+                  <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginTop: 2 }}>As an assigned external official.</p>
+                </div>
+                <button className="ub-btn ub-btn-primary" style={{ padding: '7px 12px', fontSize: 12 }} onClick={() => setReimbModalOpen(true)}>
+                  Submit
+                </button>
+              </div>
+              {!myReimbursements.length && <p className="ub-empty">No reimbursements submitted yet.</p>}
+              {myReimbursements.map((r) => (
+                <div key={r.id} style={{ padding: '8px 4px', borderBottom: '1px solid var(--ub-border-2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <b style={{ fontSize: 13 }}>{r.title}</b>
+                    <span
+                      className={`ub-pill ${r.status === 'Approved for AP' || r.status === 'Paid' ? 'ub-pill-success' : r.status === 'Rejected' ? 'ub-pill-danger' : 'ub-pill-warning'}`}
+                    >
+                      {r.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)', marginTop: 2 }}>
+                    {r.expense_date} · MVR {r.amount.toFixed(2)}
                   </div>
                 </div>
-                <span className={`portal-status ${e.myRegistration?.status === 'Approved' ? 'approved' : e.myRegistration?.status === 'Rejected' ? 'rejected' : 'pending'}`}>
-                  {e.myRegistration?.status}
-                </span>
-              </div>
-              {e.myRegistration?.team_id && (
-                <div className="portal-reg-actions">
-                  <button className="btn ghost" onClick={() => setTeamTarget({ event: e, teamId: e.myRegistration!.team_id! })}>
-                    View Team
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-          {!myRegistrations.length && <div style={{ fontSize: 12, color: 'var(--muted)' }}>You have not registered for any activities yet.</div>}
-        </div>
-      )}
-
-      {subTab === 'engagement' && (
-        <div>
-          <div className="portal-engagement-grid">
-            <div className="portal-eng-card">
-              <b>{engagement.registrations}</b>
-              <small>Approved Registrations (+3 each)</small>
-            </div>
-            <div className="portal-eng-card">
-              <b>{engagement.attendances}</b>
-              <small>Attendances Marked (+5 each)</small>
-            </div>
-            <div className="portal-eng-card">
-              <b>{engagement.achievements}</b>
-              <small>Achievements (+5 each)</small>
-            </div>
-            <div className="portal-eng-card">
-              <b>{engagement.points}</b>
-              <small>Total Points — {engagement.level}</small>
-            </div>
-          </div>
-          <div className="portal-progress">
-            <span style={{ width: `${Math.min(100, (engagement.points / 75) * 100)}%` }} />
-          </div>
-        </div>
-      )}
-
-      {subTab === 'reimbursements' && assignments.length > 0 && (
-        <div>
-          <div className="modal-actions" style={{ justifyContent: 'flex-start', marginBottom: 10 }}>
-            <button className="btn primary" onClick={() => setReimbModalOpen(true)}>
-              Submit Reimbursement
-            </button>
-          </div>
-          {myReimbursements.map((r) => (
-            <div className="portal-reimb-card" key={r.id}>
-              <div className="portal-reimb-head">
-                <h3>{r.title}</h3>
-                <span className={`portal-status ${r.status === 'Approved for AP' || r.status === 'Paid' ? 'approved' : r.status === 'Rejected' ? 'rejected' : 'pending'}`}>
-                  {r.status}
-                </span>
-              </div>
-              <div className="portal-reimb-meta">
-                {r.expense_date} · {r.vendor_name || 'No vendor'} · ${r.amount.toFixed(2)}
-              </div>
-              <div className="portal-reimb-flow">
-                {['Submitted', 'Committee', 'AP', 'Paid'].map((step, idx) => {
-                  const stepIndex = r.status === 'Rejected' ? -1 : r.status === 'Paid' ? 3 : r.status === 'Approved for AP' ? 1 : 0;
-                  return (
-                    <div key={step} className={`portal-flow-step ${idx <= stepIndex ? 'done' : ''} ${idx === stepIndex + 1 ? 'current' : ''}`}>
-                      {step}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {!myReimbursements.length && <div style={{ fontSize: 12, color: 'var(--muted)' }}>No reimbursements submitted yet.</div>}
-        </div>
-      )}
-
-      {subTab === 'team-requests' && isCommitteeUser && (
-        <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Team join requests are normally approved by the team leader — Committee can also decide here if a
-            leader is unavailable.
-          </p>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Activity</th>
-                <th>Team</th>
-                <th>Requested By</th>
-                <th>Department</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {pendingTeamJoins.map(({ event, registration }) => (
-                <tr key={registration.id}>
-                  <td>{event.name}</td>
-                  <td>{event.teams.find((t) => t.id === registration.team_id)?.team_name || '—'}</td>
-                  <td>{registration.staff_name}</td>
-                  <td>{registration.department || '—'}</td>
-                  <td style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      className="btn ghost"
-                      disabled={decidingId === registration.id}
-                      onClick={() => void handleDecideTeamJoin(registration.id, false)}
-                    >
-                      Reject
-                    </button>
-                    <button
-                      className="btn primary"
-                      disabled={decidingId === registration.id}
-                      onClick={() => void handleDecideTeamJoin(registration.id, true)}
-                    >
-                      Approve
-                    </button>
-                  </td>
-                </tr>
               ))}
-              {!pendingTeamJoins.length && (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>
-                    No pending team join requests.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <TeamDetailModal
-        event={teamTarget?.event ?? null}
-        teamId={teamTarget?.teamId ?? null}
-        onClose={() => setTeamTarget(null)}
-        onChanged={refresh}
-      />
-      <EventPortalSettingsModal event={settingsTarget} onClose={() => setSettingsTarget(null)} onSaved={refresh} />
       <ReimbursementFormModal
         open={reimbModalOpen}
         assignments={assignments}

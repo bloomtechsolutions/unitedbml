@@ -113,6 +113,31 @@ export function useStaffSearch(query: string) {
   return results;
 }
 
+export function useActiveStaffDirectory() {
+  const [staff, setStaff] = useState<StaffOption[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from('staff')
+      .select('id,uid,full_name,contact_no,department')
+      .eq('status', 'Active')
+      .order('full_name', { ascending: true })
+      .then(({ data }) => {
+        if (active) {
+          setStaff(data ?? []);
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return { staff, loading };
+}
+
 export async function createEvent(payload: Partial<EventRow>) {
   const id = payload.id ?? String(Date.now());
   const { error } = await supabase.from('events').insert({ ...payload, id });
@@ -142,6 +167,20 @@ export async function deleteTask(id: string) {
 
 export async function upsertAttendance(row: Partial<EventAttendanceRow> & { event_id: string; staff_uid: string }) {
   const { error } = await supabase.from('event_attendance').upsert(row, { onConflict: 'event_id,staff_uid' });
+  if (error) throw error;
+}
+
+export async function bulkAddAttendance(eventId: string, staff: StaffOption[]) {
+  if (!staff.length) return;
+  const rows = staff.map((s) => ({
+    event_id: eventId,
+    staff_uid: s.uid,
+    staff_name: s.full_name,
+    contact_no: s.contact_no,
+    attendance_status: 'Pending',
+    attended: false,
+  }));
+  const { error } = await supabase.from('event_attendance').upsert(rows, { onConflict: 'event_id,staff_uid', ignoreDuplicates: true });
   if (error) throw error;
 }
 

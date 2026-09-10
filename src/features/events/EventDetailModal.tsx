@@ -22,6 +22,8 @@ import {
 import { buildEventTimeline } from './timeline';
 import type { CommitteeMemberOption, EventWithChildren, StaffOption } from './types';
 import { TaskFormModal } from './TaskFormModal';
+import { AssignOfficialModal } from './AssignOfficialModal';
+import { BulkAttendanceModal } from './BulkAttendanceModal';
 import { EventWinnersPanel } from './EventWinnersPanel';
 import { syncTournamentAttendance, useLinkedTournament } from '../tournaments/useTournaments';
 import {
@@ -75,6 +77,8 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
   const staffResults = useStaffSearch(staffQuery);
   const linkedTournament = useLinkedTournament(event?.id ?? '');
   const [syncing, setSyncing] = useState(false);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [assignOfficialOpen, setAssignOfficialOpen] = useState(false);
   const { statusByEvent: financeByEvent } = useEventFinanceSummary();
   const { requests: allRequests, reload: reloadRequests } = useExpenseRequests();
   const [viewingRequest, setViewingRequest] = useState<ExpenseRequestWithLines | null>(null);
@@ -513,13 +517,21 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
               </button>
             </div>
           )}
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center' }}>
             <input
               placeholder={linkedTournament ? 'Search staff to add as walk-in…' : 'Search staff to add…'}
               value={staffQuery}
               onChange={(e) => setStaffQuery(e.target.value)}
               style={{ minWidth: 260 }}
             />
+            <button className="ub-btn ub-btn-ghost" style={{ padding: '9px 14px', fontSize: 12.5 }} onClick={() => setBulkAddOpen(true)}>
+              Bulk Add
+            </button>
+            {isCommitteeUser && (
+              <button className="ub-btn ub-btn-ghost" style={{ padding: '9px 14px', fontSize: 12.5 }} onClick={() => setAssignOfficialOpen(true)}>
+                Assign External Official
+              </button>
+            )}
           </div>
           {staffQuery && (
             <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -736,6 +748,14 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
         }}
       />
       <ActualExpenseModal event={actualExpenseOpen ? event : null} onClose={() => setActualExpenseOpen(false)} onSave={handleSaveActualExpense} />
+      <BulkAttendanceModal
+        open={bulkAddOpen}
+        eventId={event.id}
+        existingUids={new Set(event.attendance.map((a) => a.staff_uid).filter((u): u is string => !!u))}
+        onClose={() => setBulkAddOpen(false)}
+        onAdded={onRefresh}
+      />
+      <AssignOfficialModal open={assignOfficialOpen} eventId={event.id} onClose={() => setAssignOfficialOpen(false)} />
     </Modal>
   );
 }

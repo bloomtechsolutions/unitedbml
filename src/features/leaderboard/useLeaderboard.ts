@@ -15,13 +15,11 @@ export function useLeaderboard() {
       supabase.from('events').select('*'),
       supabase.from('event_attendance').select('*'),
       supabase.from('event_tasks').select('*'),
-      supabase.from('tournament_registrations').select('*'),
       supabase.from('tournament_winners').select('*'),
       supabase.from('staff').select('*'),
-    ]).then(([eventsRes, attendanceRes, tasksRes, regsRes, winnersRes, staffRes]) => {
+    ]).then(([eventsRes, attendanceRes, tasksRes, winnersRes, staffRes]) => {
       if (!active) return;
-      const firstError =
-        eventsRes.error || attendanceRes.error || tasksRes.error || regsRes.error || winnersRes.error || staffRes.error;
+      const firstError = eventsRes.error || attendanceRes.error || tasksRes.error || winnersRes.error || staffRes.error;
       if (firstError) {
         setError(firstError.message);
         setLoading(false);
@@ -32,7 +30,6 @@ export function useLeaderboard() {
           events: eventsRes.data ?? [],
           attendance: attendanceRes.data ?? [],
           tasks: tasksRes.data ?? [],
-          registrations: regsRes.data ?? [],
           winners: winnersRes.data ?? [],
           staff: staffRes.data ?? [],
         })

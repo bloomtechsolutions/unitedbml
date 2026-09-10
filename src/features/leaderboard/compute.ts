@@ -1,11 +1,4 @@
-import type {
-  EventAttendanceRow,
-  EventRow,
-  EventTaskRow,
-  StaffRow,
-  TournamentRegistrationRow,
-  TournamentWinnerRow,
-} from '../../types/database';
+import type { EventAttendanceRow, EventRow, EventTaskRow, StaffRow, TournamentWinnerRow } from '../../types/database';
 import type { ActivityItem, LeaderboardRow } from './types';
 
 function normalize(value: string | null | undefined): string {
@@ -16,19 +9,17 @@ interface Inputs {
   events: EventRow[];
   attendance: EventAttendanceRow[];
   tasks: EventTaskRow[];
-  registrations: TournamentRegistrationRow[];
   winners: TournamentWinnerRow[];
   staff: StaffRow[];
 }
 
 /**
- * Ports unitedBMLLeaderboardRows() from the legacy index.html: a purely computed ranking with no
- * dedicated table, built from event attendance/tasks + tournament registrations/winners. Row
- * identity prefers staff UID, then email, then a lowercased name (a known fragility carried over
- * from legacy — see README).
+ * Committee-driven leaderboard: attendance (marked by committee on the event roster), completed
+ * prep tasks, and recorded event winners/achievements — no self-service registration, since only
+ * committee members use this app and every input here is something committee itself enters.
  */
 export function computeLeaderboard(inputs: Inputs): LeaderboardRow[] {
-  const { events, attendance, tasks, registrations, winners, staff } = inputs;
+  const { events, attendance, tasks, winners, staff } = inputs;
   const eventById = new Map(events.map((e) => [e.id, e] as const));
   const staffByUid = new Map(staff.map((s) => [normalize(s.uid), s] as const));
   const staffByEmail = new Map(staff.filter((s) => s.email).map((s) => [normalize(s.email), s] as const));
@@ -55,11 +46,9 @@ export function computeLeaderboard(inputs: Inputs): LeaderboardRow[] {
         department: staffMatch?.department ?? null,
         points: 0,
         eventPoints: 0,
-        tournamentPoints: 0,
         taskPoints: 0,
         achievementPoints: 0,
         events: 0,
-        tournaments: 0,
         tasks: 0,
         wins: 0,
         activity: [],
@@ -74,7 +63,7 @@ export function computeLeaderboard(inputs: Inputs): LeaderboardRow[] {
     row.activity.push(item);
   }
 
-  // Event attendance: +3 once per person per event, credited when actually marked attended.
+  // Event attendance: +3 once per person per event, credited when marked attended by committee.
   for (const a of attendance) {
     if (!a.attended) continue;
     const event = eventById.get(a.event_id);
@@ -111,34 +100,17 @@ export function computeLeaderboard(inputs: Inputs): LeaderboardRow[] {
     });
   }
 
-  // Tournament registration: +3 for approved registrations.
-  for (const r of registrations) {
-    if (r.status !== 'Approved') continue;
-    const row = ensureRow(r.staff_uid, r.email, r.staff_name);
-    row.points += 3;
-    row.tournamentPoints += 3;
-    row.tournaments += 1;
-    addActivity(row, {
-      type: 'tournament',
-      title: 'Registered for tournament',
-      detail: r.staff_name,
-      points: 3,
-      at: r.requested_at,
-    });
-  }
-
-  // Tournament winners: +10 for 1st/"winner", +5 otherwise.
+  // Event winners/achievements, recorded by committee: +10 for 1st/"winner", +5 otherwise.
   for (const w of winners) {
     const isTop = /winner/i.test(w.position) || w.position.trim() === '1';
     const points = isTop ? 10 : 5;
     const row = ensureRow(w.staff_uid, null, w.winner_name);
     row.points += points;
-    row.tournamentPoints += points;
     row.achievementPoints += points;
     row.wins += 1;
     addActivity(row, {
       type: 'win',
-      title: `Tournament result: ${w.position}`,
+      title: `Result: ${w.position}`,
       detail: w.winner_name,
       points,
       at: w.created_at,

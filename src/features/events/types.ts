@@ -17,6 +17,7 @@ export interface StaffOption {
   uid: string;
   full_name: string;
   contact_no: string | null;
+  department?: string | null;
 }
 
 export const EVENT_AUDIENCE_OPTIONS = ['ALL_STAFF', 'MALE_BASED', 'ATOLL_BASED'] as const;

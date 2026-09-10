@@ -1,14 +1,14 @@
-export type LeaderboardView = 'overall' | 'events' | 'tournaments' | 'delivery';
+export type LeaderboardView = 'overall' | 'events' | 'achievements' | 'delivery';
 
 export const LEADERBOARD_VIEWS: { key: LeaderboardView; label: string }[] = [
   { key: 'overall', label: 'Overall' },
   { key: 'events', label: 'Events' },
-  { key: 'tournaments', label: 'Tournaments' },
+  { key: 'achievements', label: 'Achievements' },
   { key: 'delivery', label: 'Delivery' },
 ];
 
 export interface ActivityItem {
-  type: 'event' | 'task' | 'tournament' | 'win';
+  type: 'event' | 'task' | 'win';
   title: string;
   detail: string;
   points: number;
@@ -23,11 +23,9 @@ export interface LeaderboardRow {
   department: string | null;
   points: number;
   eventPoints: number;
-  tournamentPoints: number;
   taskPoints: number;
   achievementPoints: number;
   events: number;
-  tournaments: number;
   tasks: number;
   wins: number;
   activity: ActivityItem[];
@@ -44,7 +42,7 @@ export function leaderboardLevel(points: number): { level: LeaderboardLevel; nex
 
 export function scoreForView(row: LeaderboardRow, view: LeaderboardView): number {
   if (view === 'events') return row.eventPoints;
-  if (view === 'tournaments') return row.tournamentPoints;
+  if (view === 'achievements') return row.achievementPoints;
   if (view === 'delivery') return row.taskPoints;
   return row.points;
 }
