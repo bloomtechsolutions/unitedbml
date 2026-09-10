@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { committeeEffectiveAvailability } from '../committee/availability';
+import type { RequiredItem } from '../meetings/types';
 import { FINAL_APPROVER_ROLES } from './types';
 
 interface FinalApproverOption {
@@ -41,8 +42,9 @@ interface Props {
 export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: Props) {
   const { profile } = useAuth();
   const [title, setTitle] = useState('');
+  const titleTouched = useRef(false);
   const [eventId, setEventId] = useState('');
-  const [events, setEvents] = useState<{ id: string; name: string; planned_budget: number }[]>([]);
+  const [events, setEvents] = useState<{ id: string; name: string; planned_budget: number; data: Record<string, unknown> }[]>([]);
   const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
   const [purpose, setPurpose] = useState('');
   const [expenseDate, setExpenseDate] = useState(todayIso());
@@ -59,6 +61,7 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
   useEffect(() => {
     if (!open) return;
     setTitle('');
+    titleTouched.current = false;
     setEventId(defaultEventId ?? '');
     setCategory(CATEGORY_OPTIONS[0]);
     setPurpose('');
@@ -70,7 +73,7 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
 
     supabase
       .from('events')
-      .select('id,name,planned_budget')
+      .select('id,name,planned_budget,data')
       .eq('archived', false)
       .order('name')
       .then(({ data }) => setEvents(data ?? []));
@@ -110,6 +113,31 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
       .eq('status', 'Approved')
       .then(({ data }) => setPreviousApprovedForEvent((data ?? []).reduce((s, r) => s + (r.total_amount || 0), 0)));
   }, [open, eventId]);
+
+  // Auto-fill the title from the chosen event (until the user edits it manually), and pull in
+  // any "items required for the event" recorded on the meeting agenda that created this event.
+  useEffect(() => {
+    if (!open || !events.length) return;
+    const event = events.find((e) => e.id === eventId);
+    if (!titleTouched.current) {
+      setTitle(event ? `${event.name} Expenses` : '');
+    }
+    const requiredItems = (event?.data?.requiredItems as RequiredItem[] | undefined) ?? [];
+    if (requiredItems.length) {
+      setLines((prev) => {
+        const isPristine = prev.every((l) => !l.description.trim() && !l.rate);
+        if (!isPristine) return prev;
+        return requiredItems.map((item) => ({
+          description: item.description,
+          quantity: 1,
+          rate: item.estimatedAmount || 0,
+          vendor: '',
+          reimbursement_required: item.reimbursable,
+        }));
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, eventId, events]);
 
   const updateLine = (index: number, patch: Partial<DraftLine>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
@@ -189,7 +217,14 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
       <div className="form-grid">
         <div className="field full">
           <label>Request Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter request title" />
+          <input
+            value={title}
+            onChange={(e) => {
+              titleTouched.current = true;
+              setTitle(e.target.value);
+            }}
+            placeholder="Enter request title"
+          />
         </div>
         <div className="field">
           <label>Related Event</label>
@@ -305,7 +340,7 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
         </button>
       </div>
       {lines.map((line, i) => (
-        <div key={i} className="ap-bill-row" style={{ gridTemplateColumns: '2fr 130px 90px 110px 1fr auto' }}>
+        <div key={i} className="expense-line-row">
           <div className="field">
             <label>Description</label>
             <input value={line.description} onChange={(e) => updateLine(i, { description: e.target.value })} placeholder="Expense description" />
