@@ -18,6 +18,9 @@ interface Props {
   onOpenRequest: (id: string) => void;
   onRequestReversal: (request: ExpenseRequestWithLines) => void;
   onNewRequest: () => void;
+  settlementStatusByKey: Map<string, string>;
+  settlementKeyForRequest: (request: ExpenseRequestWithLines) => string;
+  onEnterActual: (settlementKey: string) => void;
 }
 
 export function FinanceDashboardTab({
@@ -30,6 +33,9 @@ export function FinanceDashboardTab({
   onOpenRequest,
   onRequestReversal,
   onNewRequest,
+  settlementStatusByKey,
+  settlementKeyForRequest,
+  onEnterActual,
 }: Props) {
   const [mode, setMode] = useState<BudgetMode>('approved');
   const [eventTotals, setEventTotals] = useState({ planned: 0, actual: 0 });
@@ -188,7 +194,14 @@ export function FinanceDashboardTab({
           <div className="summary">{filteredRequests.length} requests</div>
         </div>
         {filteredRequests.slice(0, 8).map((r) => (
-          <RequestCard key={r.id} request={r} onOpen={() => onOpenRequest(r.id)} onRequestReversal={() => onRequestReversal(r)} />
+          <RequestCard
+            key={r.id}
+            request={r}
+            onOpen={() => onOpenRequest(r.id)}
+            onRequestReversal={() => onRequestReversal(r)}
+            settlementStatus={settlementStatusByKey.get(settlementKeyForRequest(r))}
+            onEnterActual={() => onEnterActual(settlementKeyForRequest(r))}
+          />
         ))}
         {!filteredRequests.length && <p style={{ color: 'var(--muted)', fontSize: 12 }}>No requests match your filters.</p>}
       </div>

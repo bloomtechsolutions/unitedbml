@@ -18,9 +18,11 @@ interface Props {
   request: ExpenseRequestWithLines;
   onOpen: () => void;
   onRequestReversal: () => void;
+  settlementStatus?: string;
+  onEnterActual?: () => void;
 }
 
-export function RequestCard({ request, onOpen, onRequestReversal }: Props) {
+export function RequestCard({ request, onOpen, onRequestReversal, settlementStatus, onEnterActual }: Props) {
   const toast = useToast();
   const [generatingNote, setGeneratingNote] = useState(false);
 
@@ -73,6 +75,11 @@ export function RequestCard({ request, onOpen, onRequestReversal }: Props) {
         {request.status === 'Approved' && (
           <button className="btn soft" disabled={generatingNote} onClick={() => void handleApprovalNote()}>
             {generatingNote ? 'Generating…' : 'Approval Note'}
+          </button>
+        )}
+        {request.status === 'Approved' && settlementStatus && settlementStatus !== 'Closed' && onEnterActual && (
+          <button className="btn primary" onClick={onEnterActual}>
+            Enter Actual / Settle
           </button>
         )}
         {request.status === 'Approved' && !request.reversal_status && (

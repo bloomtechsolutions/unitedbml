@@ -6,7 +6,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { ContingencyPanel } from '../settlements/ContingencyPanel';
 import { SettlementModal } from '../settlements/SettlementModal';
-import { useSettlementRegister } from '../settlements/useSettlements';
+import { settlementKeyForRequest, useSettlementRegister } from '../settlements/useSettlements';
 import { BudgetModal } from './BudgetModal';
 import { BudgetTab } from './BudgetTab';
 import { ExcoReportTab } from './ExcoReportTab';
@@ -60,6 +60,8 @@ export function FinancePage() {
     (r) => r.status === 'Pending President Recommendation' || r.status === 'Pending Final Approval'
   );
   const pendingSettlementCount = settlementRows.filter((r) => r.status !== 'Closed').length;
+  const settlementStatusByKey = new Map(settlementRows.map((s) => [s.key, s.status] as const));
+  const settlementKeyForExpenseRequest = (r: ExpenseRequestWithLines) => (r.event_id ? r.event_id : settlementKeyForRequest(r.id));
 
   const filtered = requests.filter((r) => {
     const matchesSearch = !search || (r.title || '').toLowerCase().includes(search.toLowerCase());
@@ -161,6 +163,9 @@ export function FinancePage() {
           onOpenRequest={setDetailId}
           onRequestReversal={handleRequestReversal}
           onNewRequest={() => setFormOpen(true)}
+          settlementStatusByKey={settlementStatusByKey}
+          settlementKeyForRequest={settlementKeyForExpenseRequest}
+          onEnterActual={setSettlementKey}
         />
       )}
 
@@ -199,6 +204,8 @@ export function FinancePage() {
               request={r}
               onOpen={() => setDetailId(r.id)}
               onRequestReversal={() => void handleRequestReversal(r)}
+              settlementStatus={settlementStatusByKey.get(settlementKeyForExpenseRequest(r))}
+              onEnterActual={() => setSettlementKey(settlementKeyForExpenseRequest(r))}
             />
           ))}
           {!filtered.length && <p style={{ textAlign: 'center', color: 'var(--muted)' }}>No requests match your filters.</p>}
