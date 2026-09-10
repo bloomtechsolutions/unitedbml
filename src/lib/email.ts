@@ -26,19 +26,16 @@ function toRecipientList(value: string | string[] | undefined): string[] {
 }
 
 /**
- * Sends mail via a Power Automate HTTP-triggered Flow instead of the (unreliable, Gmail-OAuth-based)
- * Supabase Edge Function this used to call. The Flow is expected to accept this JSON body and send
- * the email itself (e.g. via an Office 365 Outlook / Outlook.com "Send an email (V2)" action) — see
- * src/lib/README-power-automate-email.md for the payload contract and Flow setup notes. Delivery
- * status still lands in email_log, written directly from the client since Power Automate has no
- * access back into Supabase.
+ * Sends mail via the app's own /api/send-email route, which in turn calls a Power Automate
+ * HTTP-triggered Flow (replacing the old, unreliable Gmail-OAuth Supabase Edge Function). The
+ * Flow's URL is a bearer credential — anyone holding it can trigger it — so it is kept as a
+ * server-only env var (POWER_AUTOMATE_EMAIL_WEBHOOK_URL) and never sent to the browser; the
+ * server route also re-checks the caller is an authenticated, active UnitedBML user before
+ * forwarding anything. See src/lib/README-power-automate-email.md for the Flow's payload
+ * contract and setup notes. Delivery status still lands in email_log, written directly from the
+ * client (Power Automate has no path back into Supabase).
  */
 export async function sendEmail(payload: SendEmailPayload) {
-  const webhookUrl = process.env.NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL?.trim();
-  if (!webhookUrl) {
-    throw new Error('Email sending is not configured — set NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL to the Power Automate Flow URL.');
-  }
-
   const to = toRecipientList(payload.to);
   const cc = toRecipientList(payload.cc);
   const attachments = payload.attachments ?? [];
@@ -47,14 +44,15 @@ export async function sendEmail(payload: SendEmailPayload) {
   }
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error('You must be signed in to send email.');
 
   let response: Response;
   try {
-    response = await fetch(webhookUrl, {
+    response = await fetch('/api/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({
         to,
         cc,
@@ -65,19 +63,16 @@ export async function sendEmail(payload: SendEmailPayload) {
         emailType: payload.emailType || 'General',
         relatedType: payload.relatedType || null,
         relatedId: payload.relatedId ? String(payload.relatedId) : null,
-        sentByEmail: user?.email ?? null,
       }),
     });
   } catch {
-    throw new Error('Could not reach the Power Automate webhook — check the network and the Flow URL.');
+    throw new Error('Could not reach the email service.');
   }
 
-  // Power Automate's default "When an HTTP request is received" trigger can respond with an
-  // empty 200/202 body unless the Flow has an explicit "Respond to a PowerApp or flow" action, and
-  // an unhandled Flow failure comes back as plain text or an Azure-style `{ error: { message } }`
-  // rather than the `{ ok, error }` shape documented in README-power-automate-email.md — read the
-  // body as text first and only parse it as JSON, so every shape ends up as a plain string message
-  // rather than accidentally stringifying an object to "[object Object]".
+  // A failure this route relays from Power Automate/Azure can be plain text or an
+  // `{ error: { message } }` object rather than the `{ ok, error }` shape below — read the body as
+  // text first and only parse it as JSON, so every shape ends up as a plain string message rather
+  // than accidentally stringifying an object to "[object Object]".
   const rawBody = await response.text().catch(() => '');
   let responseBody: { ok?: boolean; error?: unknown; message?: string; messageId?: string } | null = null;
   if (rawBody) {
@@ -101,11 +96,12 @@ export async function sendEmail(payload: SendEmailPayload) {
   }
 
   if (!response.ok || responseBody?.ok === false) {
-    throw new Error(errorMessageFrom(responseBody, rawBody) || `The email webhook rejected the request (HTTP ${response.status}).`);
+    throw new Error(errorMessageFrom(responseBody, rawBody) || `The email service rejected the request (HTTP ${response.status}).`);
   }
 
   const messageId = responseBody?.messageId || crypto.randomUUID();
   const sentAt = new Date().toISOString();
+  const user = session.user;
 
   const { error: logError } = await supabase.from('email_log').insert({
     email_type: payload.emailType || 'General',

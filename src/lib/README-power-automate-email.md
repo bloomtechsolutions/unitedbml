@@ -1,10 +1,16 @@
 # Sending email via Power Automate
 
-`sendEmail()` in `src/lib/email.ts` posts a JSON payload to the Power Automate Flow URL in
-`NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL`, instead of calling the old `send-email` Supabase
-Edge Function (Gmail OAuth). This replaces the Gmail integration entirely — the Flow itself sends
-the mail (e.g. via the "Office 365 Outlook — Send an email (V2)" or "Outlook.com — Send an email
-(V2)" action).
+`sendEmail()` in `src/lib/email.ts` posts a JSON payload to `/api/send-email`
+(`src/app/api/send-email/route.ts`), a small Next.js server route that checks the caller is an
+authenticated, active UnitedBML user and then forwards the request to a Power Automate Flow URL —
+held in the **server-only** env var `POWER_AUTOMATE_EMAIL_WEBHOOK_URL`. This replaces the old
+`send-email` Supabase Edge Function (Gmail OAuth) entirely — the Flow itself sends the mail (e.g.
+via the "Office 365 Outlook — Send an email (V2)" or "Outlook.com — Send an email (V2)" action).
+
+**The Flow's URL is a bearer credential** — its `sig=` query parameter is a signature that lets
+anyone holding the URL trigger it, no further auth required. That's why the app never puts it in a
+`NEXT_PUBLIC_` variable or calls it directly from the browser: it stays server-side, and the
+`/api/send-email` route is what the client actually talks to.
 
 ## 1. Create the Flow
 
@@ -48,7 +54,8 @@ the mail (e.g. via the "Office 365 Outlook — Send an email (V2)" or "Outlook.c
 - `emailType` / `relatedType` / `relatedId` describe what triggered the email (e.g.
   `"Procurement Pre-Approval"` / `"reimbursement_case"` / the case id) — use them for filtering,
   routing, or in the message body if useful; not required for delivery.
-- `sentByEmail` is the signed-in UnitedBML user's email address, for the "sent by" record.
+- `sentByEmail` is the signed-in UnitedBML user's email address (set by `/api/send-email`, not the
+  browser), for the "sent by" record.
 
 3. Add a **"Send an email (V2)"** action:
    - **To**: `join(triggerBody()?['to'], ';')`
@@ -69,22 +76,30 @@ the mail (e.g. via the "Office 365 Outlook — Send an email (V2)" or "Outlook.c
 
 ## 2. Wire the URL into the app
 
-Copy the Flow's **HTTP POST URL** (shown on the trigger after saving) into:
+Copy the Flow's **HTTP POST URL** (shown on the trigger after saving — the full thing, including
+the `?api-version=...&sp=...&sv=...&sig=...` query string) into:
 
 - `.env.local` for local dev, and
-- the `NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL` environment variable on whatever hosts the
-  production build (e.g. Vercel project settings) — then redeploy.
+- the `POWER_AUTOMATE_EMAIL_WEBHOOK_URL` environment variable on whatever hosts the production
+  build (e.g. Vercel project settings — a plain "Environment Variable", **not** one exposed to the
+  browser) — then redeploy (Next.js reads server-only env vars at request time, but a fresh
+  deployment is still the reliable way to pick up a newly-added one).
 
-The variable is unset by default; until it's set, `sendEmail()` throws a clear
-"Email sending is not configured" error instead of silently failing.
+Getting the URL slightly wrong (truncated, or with `&` turned into `&amp;` by a copy-paste from
+rendered HTML instead of the trigger's own copy-icon button) surfaces as Azure rejecting the
+request with "The request must be authenticated only by Shared Access scheme." — if you see that,
+re-copy the URL from the copy icon next to the HTTP POST URL field.
+
+The variable is unset by default; until it's set, `/api/send-email` returns a clear "Email sending
+is not configured on the server" error instead of silently failing.
 
 ## 3. Delivery logging
 
 Power Automate has no access back into Supabase, so the client writes the `email_log` row itself
-right after a successful webhook response (same table/columns the old Edge Function wrote to —
-Finance, Reimbursements, etc. keep working unchanged). If a Flow run fails, nothing is logged and
-`sendEmail()` throws, so the caller's existing error handling (toasts, "Failed to send…" banners)
-still applies.
+right after a successful response from `/api/send-email` (same table/columns the old Edge Function
+wrote to — Finance, Reimbursements, etc. keep working unchanged). If a Flow run fails, nothing is
+logged and `sendEmail()` throws, so the caller's existing error handling (toasts, "Failed to
+send…" banners) still applies.
 
 ## 4. Retiring the old path
 
