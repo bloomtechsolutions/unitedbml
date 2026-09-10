@@ -197,16 +197,3 @@ export async function updateEventAttendanceCount(eventId: string, count: number)
   if (error) throw error;
 }
 
-export async function recordActualExpense(eventId: string, amount: number, remarks: string) {
-  const { error } = await supabase.rpc('record_event_actual_expense', {
-    p_event_id: eventId,
-    p_amount: amount,
-    p_remarks: remarks || null,
-  });
-  if (error) throw error;
-}
-
-export async function closeEventFinanceSettlement(eventId: string) {
-  const { error } = await supabase.rpc('close_event_finance_settlement', { p_event_id: eventId });
-  if (error) throw error;
-}

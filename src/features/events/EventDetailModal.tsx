@@ -10,7 +10,7 @@ import { getEventApprovedBudget, getEventFinanceRequests, useEventFinanceSummary
 import { RequestDetailModal } from '../finance/RequestDetailModal';
 import { RequestFormModal } from '../finance/RequestFormModal';
 import type { ExpenseRequestWithLines } from '../finance/types';
-import { ActualExpenseModal } from './ActualExpenseModal';
+import { SettlementModal } from '../settlements/SettlementModal';
 import {
   daysUntilEvent,
   eventLifecycle,
@@ -27,10 +27,8 @@ import { BulkAttendanceModal } from './BulkAttendanceModal';
 import { EventWinnersPanel } from './EventWinnersPanel';
 import { syncTournamentAttendance, useLinkedTournament } from '../tournaments/useTournaments';
 import {
-  closeEventFinanceSettlement,
   deleteAttendance,
   deleteTask,
-  recordActualExpense,
   upsertAttendance,
   upsertTask,
   updateEventAttendanceCount,
@@ -83,8 +81,7 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
   const { requests: allRequests, reload: reloadRequests } = useExpenseRequests();
   const [viewingRequest, setViewingRequest] = useState<ExpenseRequestWithLines | null>(null);
   const [newRequestOpen, setNewRequestOpen] = useState(false);
-  const [actualExpenseOpen, setActualExpenseOpen] = useState(false);
-  const [closingSettlement, setClosingSettlement] = useState(false);
+  const [settlementOpen, setSettlementOpen] = useState(false);
   const { isCommitteeUser } = useAuth();
   const toast = useToast();
 
@@ -179,25 +176,6 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
     await updateEventAttendanceCount(event.id, attendedCount);
     await onRefresh();
     toast('Removed from roster');
-  };
-
-  const handleSaveActualExpense = async (amount: number, remarks: string) => {
-    await recordActualExpense(event.id, amount, remarks);
-    await onRefresh();
-    toast('Actual expenses recorded');
-  };
-
-  const handleCloseSettlement = async () => {
-    setClosingSettlement(true);
-    try {
-      await closeEventFinanceSettlement(event.id);
-      await onRefresh();
-      toast('Finance settlement closed');
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to close settlement.');
-    } finally {
-      setClosingSettlement(false);
-    }
   };
 
   const openTasks = event.tasks.filter((t) => !t.done);
@@ -617,8 +595,8 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
                   <button className="ub-btn ub-btn-ghost" style={{ padding: '8px 14px', fontSize: 12.5 }} onClick={() => setNewRequestOpen(true)}>
                     + Expense Request
                   </button>
-                  <button className="ub-btn ub-btn-primary" style={{ padding: '8px 14px', fontSize: 12.5 }} onClick={() => setActualExpenseOpen(true)}>
-                    Actual Expenses
+                  <button className="ub-btn ub-btn-primary" style={{ padding: '8px 14px', fontSize: 12.5 }} onClick={() => setSettlementOpen(true)}>
+                    {event.finance_settlement_status === 'Closed' ? 'View Settlement' : 'Enter Actual / Settle'}
                   </button>
                 </div>
               </div>
@@ -703,19 +681,15 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
                 <button
                   className="ub-btn ub-btn-primary"
                   style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
-                  onClick={() => void handleCloseSettlement()}
-                  disabled={closingSettlement || !event.actual_entered_at}
+                  onClick={() => setSettlementOpen(true)}
                 >
-                  {closingSettlement ? 'Closing…' : 'Close Finance Settlement'}
+                  Enter Actual / Settle
                 </button>
-              )}
-              {!event.actual_entered_at && isCommitteeUser && event.finance_settlement_status !== 'Closed' && (
-                <p style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)', marginTop: 8 }}>Enter actual expenses before closing settlement.</p>
               )}
 
               <div style={{ marginTop: 16, padding: 12, background: 'var(--ub-surface-2)', borderRadius: 10, fontSize: 11.5, color: 'var(--ub-ink-faint)', lineHeight: 1.5 }}>
-                Approved Budget remains the authorization record. Actual Expense can be entered by any signed-in user after the
-                event and is used for Exco reporting.
+                Approved Budget remains the authorization record. Actual Expense is entered per line — reimbursement lines sync
+                automatically from Reimbursements/AP — and is used for Exco reporting.
               </div>
             </div>
           </div>
@@ -747,7 +721,14 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
           toast('Expense request created');
         }}
       />
-      <ActualExpenseModal event={actualExpenseOpen ? event : null} onClose={() => setActualExpenseOpen(false)} onSave={handleSaveActualExpense} />
+      <SettlementModal
+        settlementKey={settlementOpen ? event.id : null}
+        onClose={() => setSettlementOpen(false)}
+        onChanged={async () => {
+          await reloadRequests();
+          await onRefresh();
+        }}
+      />
       <BulkAttendanceModal
         open={bulkAddOpen}
         eventId={event.id}
