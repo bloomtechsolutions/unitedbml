@@ -72,15 +72,36 @@ export async function sendEmail(payload: SendEmailPayload) {
     throw new Error('Could not reach the Power Automate webhook — check the network and the Flow URL.');
   }
 
-  let responseBody: { ok?: boolean; error?: string; messageId?: string } | null = null;
-  try {
-    responseBody = await response.json();
-  } catch {
-    // Power Automate's default "When an HTTP request is received" trigger can respond with an
-    // empty 200/202 body unless the Flow has an explicit "Respond to a PowerApp or flow" action.
+  // Power Automate's default "When an HTTP request is received" trigger can respond with an
+  // empty 200/202 body unless the Flow has an explicit "Respond to a PowerApp or flow" action, and
+  // an unhandled Flow failure comes back as plain text or an Azure-style `{ error: { message } }`
+  // rather than the `{ ok, error }` shape documented in README-power-automate-email.md — read the
+  // body as text first and only parse it as JSON, so every shape ends up as a plain string message
+  // rather than accidentally stringifying an object to "[object Object]".
+  const rawBody = await response.text().catch(() => '');
+  let responseBody: { ok?: boolean; error?: unknown; message?: string; messageId?: string } | null = null;
+  if (rawBody) {
+    try {
+      responseBody = JSON.parse(rawBody);
+    } catch {
+      // Not JSON — rawBody itself is used as the error message below.
+    }
   }
+
+  function errorMessageFrom(body: typeof responseBody, raw: string): string | null {
+    const err = body?.error;
+    if (typeof err === 'string' && err) return err;
+    if (err && typeof err === 'object') {
+      const nested = (err as { message?: string; code?: string }).message;
+      if (nested) return nested;
+    }
+    if (typeof body?.message === 'string' && body.message) return body.message;
+    if (raw.trim()) return raw.trim().slice(0, 500);
+    return null;
+  }
+
   if (!response.ok || responseBody?.ok === false) {
-    throw new Error(responseBody?.error || `The email webhook rejected the request (HTTP ${response.status}).`);
+    throw new Error(errorMessageFrom(responseBody, rawBody) || `The email webhook rejected the request (HTTP ${response.status}).`);
   }
 
   const messageId = responseBody?.messageId || crypto.randomUUID();
