@@ -324,7 +324,6 @@ export default function DashboardPage() {
                 {[
                   { href: '/events', label: 'My Events', small: 'Assigned activities' },
                   { href: '/meetings', label: 'My Meetings', small: 'Actions & minutes' },
-                  { href: '/tournaments', label: 'My Tournaments', small: 'Registrations & teams' },
                   { href: '/reimbursements', label: 'My Requests', small: 'Reimbursement status' },
                 ].map((s) => (
                   <Link
@@ -396,15 +395,13 @@ export default function DashboardPage() {
           <div className="ub-card">
             <div style={{ marginBottom: 14 }}>
               <h3 style={{ fontSize: 15, fontWeight: 700 }}>Operational Pulse</h3>
-              <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Events, meetings, reimbursements and tournament status.</p>
+              <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Events, meetings and reimbursements status.</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
               {[
                 { label: 'Active events', value: dash.operationalPulse.activeEvents },
                 { label: 'Upcoming meetings', value: dash.operationalPulse.upcomingMeetings },
                 { label: 'Open reimbursements', value: dash.operationalPulse.openReimbursements },
-                { label: 'Active tournaments', value: dash.operationalPulse.activeTournaments },
-                { label: 'Live tournaments', value: dash.operationalPulse.liveTournaments },
                 { label: 'Overdue tasks', value: dash.operationalPulse.overdueTasks },
               ].map((m) => (
                 <div key={m.label}>

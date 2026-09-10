@@ -22,6 +22,7 @@ import {
 import { buildEventTimeline } from './timeline';
 import type { CommitteeMemberOption, EventWithChildren, StaffOption } from './types';
 import { TaskFormModal } from './TaskFormModal';
+import { EventWinnersPanel } from './EventWinnersPanel';
 import { syncTournamentAttendance, useLinkedTournament } from '../tournaments/useTournaments';
 import {
   closeEventFinanceSettlement,
@@ -34,7 +35,7 @@ import {
   useStaffSearch,
 } from './useEvents';
 
-type Tab = 'overview' | 'assignments' | 'timeline' | 'attendance' | 'budget';
+type Tab = 'overview' | 'assignments' | 'timeline' | 'attendance' | 'winners' | 'budget';
 
 const LIFECYCLE_STEPS: EventLifecycle[] = ['Planning', 'Ready', 'Event Day', 'Post-Event Settlement', 'Closed'];
 
@@ -258,6 +259,9 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
         </button>
         <button className={`ub-tab ${tab === 'attendance' ? 'active' : ''}`} onClick={() => setTab('attendance')}>
           Attendance ({event.attendance.length})
+        </button>
+        <button className={`ub-tab ${tab === 'winners' ? 'active' : ''}`} onClick={() => setTab('winners')}>
+          Winners
         </button>
         <button className={`ub-tab ${tab === 'budget' ? 'active' : ''}`} onClick={() => setTab('budget')}>
           Budget &amp; Expenses
@@ -564,6 +568,8 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
           </table>
         </div>
       )}
+
+      {tab === 'winners' && <EventWinnersPanel eventId={event.id} eventName={event.name} canManage={isCommitteeUser} />}
 
       {tab === 'budget' && (
         <div>

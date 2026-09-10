@@ -65,10 +65,7 @@ const NAV_AREAS: NavArea[] = [
     label: 'Events',
     to: '/events',
     icon: ICONS.events,
-    subItems: [
-      { to: '/events', label: 'Events & Activities' },
-      { to: '/tournaments', label: 'Tournaments' },
-    ],
+    subItems: [{ to: '/events', label: 'Events & Activities' }],
   },
   {
     label: 'Finance',

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../../lib/supabase';
 import type { Profile } from '../../types/database';
 import { eventLifecycle, localTodayIso } from '../events/lifecycle';
 import { useEvents } from '../events/useEvents';
@@ -74,35 +73,12 @@ function relativeDay(iso: string): string {
   return iso;
 }
 
-function useTournamentPulse() {
-  const [active, setActive] = useState(0);
-  const [live, setLive] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    supabase
-      .from('tournaments')
-      .select('status')
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        setActive(data.filter((t) => !['Completed', 'Cancelled'].includes(t.status)).length);
-        setLive(data.filter((t) => t.status === 'Live').length);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { active, live };
-}
-
 export function useDashboard(profile: Profile | null) {
   const { events, loading: eventsLoading } = useEvents();
   const { meetings, loading: meetingsLoading } = useMeetings();
   const { budget, loading: budgetLoading } = useBudget();
   const { requests, loading: requestsLoading } = useExpenseRequests();
   const { cases: reimbursementCases, batches: apBatches, loading: reimbLoading } = useReimbursementCases();
-  const tournamentPulse = useTournamentPulse();
 
   const [view, setView] = useState<DashboardView>('Executive');
   const [agendaRange, setAgendaRange] = useState<7 | 30>(7);
@@ -293,11 +269,9 @@ export function useDashboard(profile: Profile | null) {
       activeEvents: activeEvents.length,
       upcomingMeetings: meetings.filter((m) => !m.cancelled && m.meeting_date && m.meeting_date >= today).length,
       openReimbursements: openReimbursements.length,
-      activeTournaments: tournamentPulse.active,
-      liveTournaments: tournamentPulse.live,
       overdueTasks: overdueTasks.length,
     }),
-    [activeEvents, meetings, openReimbursements, tournamentPulse, overdueTasks, today]
+    [activeEvents, meetings, openReimbursements, overdueTasks, today]
   );
 
   return {
