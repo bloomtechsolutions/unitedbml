@@ -165,12 +165,19 @@ export async function createExpenseRequest(
     final_approver_role: string;
     final_approver_email: string;
     president_availability: string;
+    request_date: string;
+    planned_event_budget: number;
+    previous_approved_event_spend: number;
+    overrun_justification: string | null;
+    budget_available_before_approval: number;
   },
   lines: DraftLine[]
 ) {
   const { subtotal, contingencyAmount, total } = computeTotals(lines);
   const id = crypto.randomUUID();
   const onLeave = payload.president_availability.toLowerCase() === 'on leave';
+  const projectedEventSpend = payload.planned_event_budget > 0 ? payload.previous_approved_event_spend + total : 0;
+  const overBudget = payload.planned_event_budget > 0 && projectedEventSpend > payload.planned_event_budget;
 
   const { error: requestError } = await supabase.from('expense_requests').insert({
     id,
@@ -178,7 +185,7 @@ export async function createExpenseRequest(
     title: payload.title,
     event_id: payload.event_id,
     event_name: payload.event_name,
-    request_date: new Date().toISOString().slice(0, 10),
+    request_date: payload.request_date,
     category: payload.category,
     purpose: payload.purpose,
     requested_by: payload.requested_by,
@@ -194,6 +201,14 @@ export async function createExpenseRequest(
     contingency_amount: contingencyAmount,
     total_amount: total,
     submitted_at: new Date().toISOString(),
+    planned_event_budget: payload.planned_event_budget,
+    previous_approved_event_spend: payload.previous_approved_event_spend,
+    projected_event_spend: projectedEventSpend,
+    over_budget: overBudget,
+    overrun_amount: overBudget ? projectedEventSpend - payload.planned_event_budget : 0,
+    overrun_justification: overBudget ? payload.overrun_justification : null,
+    budget_available_before_approval: payload.budget_available_before_approval,
+    budget_available_after_approval: payload.budget_available_before_approval - total,
   });
   if (requestError) throw requestError;
 

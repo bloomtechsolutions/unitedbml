@@ -61,9 +61,27 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
       </div>
 
       <p style={{ marginTop: 12, fontSize: 13 }}>
-        <b>Event:</b> {request.event_name || '—'} &nbsp; <b>Category:</b> {request.category || '—'}
+        <b>Event:</b> {request.event_name || '—'} &nbsp; <b>Category:</b> {request.category || '—'} &nbsp; <b>Date:</b> {request.request_date || '—'}
       </p>
       <p style={{ fontSize: 13 }}>{request.purpose}</p>
+
+      {request.planned_event_budget > 0 && (
+        <div className={request.over_budget ? 'audit-warning' : 'audit-success'}>
+          {request.over_budget ? (
+            <>
+              <b>⚠ Over Budget</b>
+              <br />
+              This request exceeds the event&apos;s original planned budget by <b>MVR {request.overrun_amount.toLocaleString()}</b>.
+              <br />
+              <b>Inputter justification:</b> {request.overrun_justification || '—'}
+              <br />
+              The event planned budget remains unchanged.
+            </>
+          ) : (
+            "This request is within the event's planned budget."
+          )}
+        </div>
+      )}
 
       <table className="table">
         <thead>

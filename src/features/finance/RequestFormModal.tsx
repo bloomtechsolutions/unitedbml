@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
@@ -16,7 +16,20 @@ interface FinalApproverOption {
 import type { DraftLine } from './types';
 import { createExpenseRequest } from './useFinance';
 
+const CATEGORY_OPTIONS = ['Event', 'Sports', 'Communication', 'Meeting', 'Travel', 'Other'];
+
 const EMPTY_LINE = (): DraftLine => ({ description: '', quantity: 1, rate: 0, vendor: '', reimbursement_required: false });
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+interface PresidentInfo {
+  name: string;
+  availability: string;
+  leave_from: string | null;
+  leave_to: string | null;
+}
 
 interface Props {
   open: boolean;
@@ -29,12 +42,16 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
   const { profile } = useAuth();
   const [title, setTitle] = useState('');
   const [eventId, setEventId] = useState('');
-  const [events, setEvents] = useState<{ id: string; name: string }[]>([]);
-  const [category, setCategory] = useState('');
+  const [events, setEvents] = useState<{ id: string; name: string; planned_budget: number }[]>([]);
+  const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
   const [purpose, setPurpose] = useState('');
+  const [expenseDate, setExpenseDate] = useState(todayIso());
   const [finalApproverId, setFinalApproverId] = useState('');
   const [finalApprovers, setFinalApprovers] = useState<FinalApproverOption[]>([]);
-  const [presidentAvailability, setPresidentAvailability] = useState<'Available' | 'On Leave'>('Available');
+  const [president, setPresident] = useState<PresidentInfo | null>(null);
+  const [previousApprovedForEvent, setPreviousApprovedForEvent] = useState(0);
+  const [clubAvailableBudget, setClubAvailableBudget] = useState(0);
+  const [overrunJustification, setOverrunJustification] = useState('');
   const [lines, setLines] = useState<DraftLine[]>([EMPTY_LINE()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,13 +60,20 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
     if (!open) return;
     setTitle('');
     setEventId(defaultEventId ?? '');
-    setCategory('');
+    setCategory(CATEGORY_OPTIONS[0]);
     setPurpose('');
+    setExpenseDate(todayIso());
     setFinalApproverId('');
+    setOverrunJustification('');
     setLines([EMPTY_LINE()]);
     setError(null);
 
-    supabase.from('events').select('id,name').eq('archived', false).order('name').then(({ data }) => setEvents(data ?? []));
+    supabase
+      .from('events')
+      .select('id,name,planned_budget')
+      .eq('archived', false)
+      .order('name')
+      .then(({ data }) => setEvents(data ?? []));
     supabase
       .from('committee_members')
       .select('id,name,role,status,email')
@@ -61,11 +85,31 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
       .select('name,role,availability,leave_from,leave_to')
       .eq('role', 'President')
       .maybeSingle()
-      .then(({ data }) => {
-        if (!data) return;
-        setPresidentAvailability(committeeEffectiveAvailability(data) === 'On Leave' ? 'On Leave' : 'Available');
-      });
+      .then(({ data }) => setPresident(data ?? null));
+
+    const year = new Date().getFullYear();
+    Promise.all([
+      supabase.from('budgets').select('approved_amount').eq('budget_year', year).maybeSingle(),
+      supabase.from('expense_requests').select('total_amount').eq('status', 'Approved'),
+    ]).then(([budgetRes, requestsRes]) => {
+      const annual = budgetRes.data?.approved_amount ?? 0;
+      const approved = (requestsRes.data ?? []).reduce((s, r) => s + (r.total_amount || 0), 0);
+      setClubAvailableBudget(annual - approved);
+    });
   }, [open, defaultEventId]);
+
+  useEffect(() => {
+    if (!open || !eventId) {
+      setPreviousApprovedForEvent(0);
+      return;
+    }
+    supabase
+      .from('expense_requests')
+      .select('total_amount')
+      .eq('event_id', eventId)
+      .eq('status', 'Approved')
+      .then(({ data }) => setPreviousApprovedForEvent((data ?? []).reduce((s, r) => s + (r.total_amount || 0), 0)));
+  }, [open, eventId]);
 
   const updateLine = (index: number, patch: Partial<DraftLine>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
@@ -73,6 +117,19 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
 
   const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.rate, 0);
   const contingency = Math.round(subtotal * 0.05 * 100) / 100;
+  const total = subtotal + contingency;
+
+  const selectedEvent = events.find((e) => e.id === eventId);
+  const plannedBudget = selectedEvent?.planned_budget ?? 0;
+  const isEventLinked = !!selectedEvent && plannedBudget > 0;
+  const projected = previousApprovedForEvent + total;
+  const overBudget = isEventLinked && projected > plannedBudget;
+
+  const presidentAvailability = useMemo(() => {
+    if (!president) return null;
+    return committeeEffectiveAvailability(president, expenseDate);
+  }, [president, expenseDate]);
+  const presidentOnLeave = presidentAvailability === 'On Leave' || presidentAvailability === 'Leave Scheduled';
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -89,6 +146,10 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
       setError('Select a final approver.');
       return;
     }
+    if (overBudget && !overrunJustification.trim()) {
+      setError('This request exceeds the event’s planned budget — add a justification for the overrun.');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -96,8 +157,8 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
         {
           title: title.trim(),
           event_id: eventId || null,
-          event_name: events.find((e) => e.id === eventId)?.name ?? null,
-          category: category || null,
+          event_name: selectedEvent?.name ?? null,
+          category,
           purpose: purpose || null,
           requested_by: profile?.full_name || profile?.email || 'Unknown',
           requester_role: profile?.role || '',
@@ -105,7 +166,12 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
           final_approver_name: approver.name ?? '',
           final_approver_role: approver.role,
           final_approver_email: approver.email ?? '',
-          president_availability: presidentAvailability,
+          president_availability: presidentOnLeave ? 'On Leave' : 'Available',
+          request_date: expenseDate,
+          planned_event_budget: plannedBudget,
+          previous_approved_event_spend: previousApprovedForEvent,
+          overrun_justification: overrunJustification || null,
+          budget_available_before_approval: clubAvailableBudget,
         },
         validLines
       );
@@ -122,13 +188,13 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
     <Modal open={open} onClose={onClose} title="New Expense Request" wide>
       <div className="form-grid">
         <div className="field full">
-          <label>Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <label>Request Title</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter request title" />
         </div>
         <div className="field">
-          <label>Related Event (optional)</label>
+          <label>Related Event</label>
           <select value={eventId} onChange={(e) => setEventId(e.target.value)}>
-            <option value="">None</option>
+            <option value="">General Club Expense</option>
             {events.map((ev) => (
               <option key={ev.id} value={ev.id}>
                 {ev.name}
@@ -137,42 +203,123 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
           </select>
         </div>
         <div className="field">
-          <label>Category</label>
-          <input value={category} onChange={(e) => setCategory(e.target.value)} />
-        </div>
-        <div className="field full">
-          <label>Purpose</label>
-          <textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} />
+          <label>Inputter</label>
+          <input value={`${profile?.full_name || profile?.email || 'Unknown'} — ${profile?.role || ''}`} readOnly />
         </div>
         <div className="field">
           <label>Final Approver</label>
           <select value={finalApproverId} onChange={(e) => setFinalApproverId(e.target.value)}>
-            <option value="">Select approver</option>
+            <option value="">Select available final approver</option>
             {finalApprovers.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} ({a.role})
+                {a.name} — {a.role}
               </option>
             ))}
           </select>
         </div>
         <div className="field">
-          <label>President Availability</label>
-          <select
-            value={presidentAvailability}
-            onChange={(e) => setPresidentAvailability(e.target.value as 'Available' | 'On Leave')}
-          >
-            <option value="Available">Available</option>
-            <option value="On Leave">On Leave (skip to Final Approval)</option>
+          <label>Expense Date</label>
+          <input type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} />
+        </div>
+
+        <div className="field full">
+          {!president && (
+            <div className="leave-banner">No active President is assigned in Committee Management. Finance cannot determine the recommendation route.</div>
+          )}
+          {president && presidentOnLeave && (
+            <div className="leave-banner">
+              <b>{president.name}</b>, President, is marked On Leave. This request will bypass President recommendation and go directly to
+              the selected final approver.
+            </div>
+          )}
+          {president && !presidentOnLeave && (
+            <div className="leave-banner available">
+              <b>{president.name}</b>, President, is available. This request will follow Inputter → President Recommendation → Final
+              Approver.
+            </div>
+          )}
+        </div>
+
+        <div className="field">
+          <label>Category</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {CATEGORY_OPTIONS.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
           </select>
+        </div>
+        <div className="field full">
+          <label>Purpose / Justification</label>
+          <textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Why is this expense required?" />
         </div>
       </div>
 
-      <h4 style={{ marginTop: 18, marginBottom: 8 }}>Line Items</h4>
+      {isEventLinked && (
+        <div className="overrun-box show">
+          <b>{overBudget ? '⚠ Budget Overrun Detected' : 'Event Budget Check'}</b>
+          {overBudget && (
+            <div>This request would take the event above its original planned budget. The planned budget will remain unchanged.</div>
+          )}
+          <div className="overrun-grid">
+            <div className="mini">
+              <small>Planned Budget</small>
+              <strong>MVR {plannedBudget.toLocaleString()}</strong>
+            </div>
+            <div className="mini">
+              <small>Previously Approved</small>
+              <strong>MVR {previousApprovedForEvent.toLocaleString()}</strong>
+            </div>
+            <div className="mini">
+              <small>Current Request</small>
+              <strong>MVR {total.toLocaleString()}</strong>
+            </div>
+            <div className="mini">
+              <small>{overBudget ? 'Overrun' : 'Remaining After Request'}</small>
+              <strong>MVR {Math.abs(plannedBudget - projected).toLocaleString()}</strong>
+            </div>
+          </div>
+          {overBudget && (
+            <div className="field full" style={{ marginTop: 12 }}>
+              <label>Budget Overrun Justification</label>
+              <textarea
+                value={overrunJustification}
+                onChange={(e) => setOverrunJustification(e.target.value)}
+                placeholder="Explain why this request exceeds the event's planned budget..."
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0 10px' }}>
+        <div>
+          <h4 style={{ margin: 0 }}>Expense Items</h4>
+          <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>
+            Add one or more expense lines.
+          </div>
+        </div>
+        <button className="btn soft" type="button" onClick={() => setLines((prev) => [...prev, EMPTY_LINE()])}>
+          + Add Item
+        </button>
+      </div>
       {lines.map((line, i) => (
-        <div key={i} className="ap-bill-row" style={{ gridTemplateColumns: '2fr 90px 110px 1fr 90px auto' }}>
+        <div key={i} className="ap-bill-row" style={{ gridTemplateColumns: '2fr 130px 90px 110px 1fr auto' }}>
           <div className="field">
             <label>Description</label>
-            <input value={line.description} onChange={(e) => updateLine(i, { description: e.target.value })} />
+            <input value={line.description} onChange={(e) => updateLine(i, { description: e.target.value })} placeholder="Expense description" />
+          </div>
+          <div className="field">
+            <label>Reimbursement</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+              <input
+                type="checkbox"
+                checked={line.reimbursement_required}
+                onChange={(e) => updateLine(i, { reimbursement_required: e.target.checked })}
+              />
+              Requires reimbursement pre-approval
+            </label>
           </div>
           <div className="field">
             <label>Qty</label>
@@ -186,36 +333,29 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
             <label>Vendor</label>
             <input value={line.vendor} onChange={(e) => updateLine(i, { vendor: e.target.value })} />
           </div>
-          <div className="field">
-            <label>Reimb.</label>
-            <input
-              type="checkbox"
-              checked={line.reimbursement_required}
-              onChange={(e) => updateLine(i, { reimbursement_required: e.target.checked })}
-            />
-          </div>
           <button className="btn danger" onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}>
-            Remove
+            ✕
           </button>
         </div>
       ))}
-      <button className="btn ghost" onClick={() => setLines((prev) => [...prev, EMPTY_LINE()])}>
-        + Add Line
-      </button>
 
       <div className="mini-stat" style={{ marginTop: 16 }}>
         <div className="mini">
           <small>Subtotal</small>
-          <strong>{subtotal.toLocaleString()}</strong>
+          <strong>MVR {subtotal.toLocaleString()}</strong>
         </div>
         <div className="mini">
           <small>Contingency (5%)</small>
-          <strong>{contingency.toLocaleString()}</strong>
+          <strong>MVR {contingency.toLocaleString()}</strong>
         </div>
         <div className="mini">
-          <small>Total</small>
-          <strong>{(subtotal + contingency).toLocaleString()}</strong>
+          <small>Request Total</small>
+          <strong>MVR {total.toLocaleString()}</strong>
         </div>
+      </div>
+
+      <div className="finance-note" style={{ marginTop: 14 }}>
+        Available budget before this request: <b>MVR {clubAvailableBudget.toLocaleString()}</b>
       </div>
 
       {error && <div style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>{error}</div>}
@@ -224,7 +364,7 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
           Cancel
         </button>
         <button className="btn primary" onClick={() => void handleSubmit()} disabled={saving}>
-          {saving ? 'Submitting…' : 'Submit Request'}
+          {saving ? 'Submitting…' : 'Submit for Approval'}
         </button>
       </div>
     </Modal>
