@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { evidenceUrl } from '../reimbursements/storage';
-import { generateApprovedExpenseNotePdf } from '../../lib/expenseNotePdf';
+import { generateApprovedExpenseNotePdf, openGeneratedAttachment } from '../../lib/expenseNotePdf';
 import type { DocumentRegistryRow } from '../../types/database';
 import { documentSignedUrl, removeDocumentFile, uploadDocumentFile } from './storage';
 import type { VirtualDocument } from './types';
@@ -133,14 +133,7 @@ export function useApprovedNotes() {
 
 /** Generates the Approved Expense Approval Note PDF and opens it in a new tab via a blob URL. */
 export async function openApprovedNote(expenseRequestId: string) {
-  const attachment = await generateApprovedExpenseNotePdf(expenseRequestId);
-  const binary = atob(attachment.content);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const blob = new Blob([bytes], { type: attachment.contentType });
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  openGeneratedAttachment(await generateApprovedExpenseNotePdf(expenseRequestId));
 }
 
 /**

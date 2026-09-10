@@ -179,10 +179,47 @@ export function ContingencyPanel() {
 
   const filtered = requests.filter((r) => !statusFilter || r.status === statusFilter);
 
+  const summary = {
+    presidentQueue: requests.filter((r) => r.status === 'Pending President Recommendation').length,
+    procurementQueue: requests.filter((r) => r.status === 'Pending Procurement Pre-Approval').length,
+    awaitingResponse: requests.filter((r) => r.status === 'Awaiting Procurement Response').length,
+    released: requests.filter((r) => r.status === 'Approved').reduce((s, r) => s + Number(r.released_amount || 0), 0),
+  };
+
   if (loading) return <div>Loading contingency requests…</div>;
 
   return (
     <div>
+      <div className="contingency-register-head">
+        <div>
+          <h3>Contingency Register</h3>
+          <p>Central audit register for President recommendation, Procurement pre-approval and contingency release.</p>
+        </div>
+      </div>
+
+      <div className="contingency-register-summary">
+        <div>
+          <small>President Queue</small>
+          <b>{summary.presidentQueue}</b>
+          <span>awaiting recommendation</span>
+        </div>
+        <div>
+          <small>Procurement Queue</small>
+          <b>{summary.procurementQueue}</b>
+          <span>ready to send</span>
+        </div>
+        <div>
+          <small>Awaiting Response</small>
+          <b>{summary.awaitingResponse}</b>
+          <span>Procurement reply pending</span>
+        </div>
+        <div>
+          <small>Released</small>
+          <b>MVR {summary.released.toLocaleString()}</b>
+          <span>approved contingency</span>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <p style={{ fontSize: 12.5, color: 'var(--ub-ink-faint, #6b7280)' }}>
           Requester → President recommendation → Procurement pre-approval → Approved/Released or Rejected. Capped at each request&apos;s fixed

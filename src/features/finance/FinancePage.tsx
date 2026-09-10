@@ -8,6 +8,10 @@ import { ContingencyPanel } from '../settlements/ContingencyPanel';
 import { SettlementModal } from '../settlements/SettlementModal';
 import { useSettlementRegister } from '../settlements/useSettlements';
 import { BudgetModal } from './BudgetModal';
+import { BudgetTab } from './BudgetTab';
+import { ExcoReportTab } from './ExcoReportTab';
+import { FinanceDashboardTab } from './FinanceDashboardTab';
+import { RequestCard } from './RequestCard';
 import { RequestDetailModal } from './RequestDetailModal';
 import { RequestFormModal } from './RequestFormModal';
 import type { ExpenseRequestWithLines } from './types';
@@ -16,13 +20,14 @@ import {
   approvedSpend,
   availableBudget,
   decideReversal,
+  requestReversal,
   useBudget,
   useCurrentActor,
   useExpenseRequests,
   useReversals,
 } from './useFinance';
 
-type SubTab = 'requests' | 'approvals' | 'reversals' | 'settlements' | 'contingency';
+type SubTab = 'dashboard' | 'requests' | 'approvals' | 'reversals' | 'settlements' | 'contingency' | 'budget' | 'exco';
 
 export function FinancePage() {
   const { budget, loading: budgetLoading, reload: reloadBudget } = useBudget();
@@ -32,7 +37,7 @@ export function FinancePage() {
   const { profile, isCommitteeUser } = useAuth();
   const toast = useToast();
 
-  const [subTab, setSubTab] = useState<SubTab>('requests');
+  const [subTab, setSubTab] = useState<SubTab>('dashboard');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -54,6 +59,7 @@ export function FinancePage() {
   const pending = requests.filter(
     (r) => r.status === 'Pending President Recommendation' || r.status === 'Pending Final Approval'
   );
+  const pendingSettlementCount = settlementRows.filter((r) => r.status !== 'Closed').length;
 
   const filtered = requests.filter((r) => {
     const matchesSearch = !search || (r.title || '').toLowerCase().includes(search.toLowerCase());
@@ -81,6 +87,18 @@ export function FinancePage() {
     }
   };
 
+  const handleRequestReversal = async (request: ExpenseRequestWithLines) => {
+    const reason = prompt('Reason for reversal:');
+    if (!reason) return;
+    try {
+      await requestReversal(request.id, reason, profile?.full_name || '', profile?.id || '');
+      await refreshAll();
+      toast('Reversal requested');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to request reversal.');
+    }
+  };
+
   if (loading || budgetLoading) return <div>Loading finance…</div>;
   if (error) return <div style={{ color: 'var(--danger)' }}>Failed to load finance: {error}</div>;
 
@@ -90,8 +108,8 @@ export function FinancePage() {
     <div>
       <div className="page-head">
         <div>
-          <h2>Finance</h2>
-          <p>Submit expense requests, track approvals, and monitor budget utilization.</p>
+          <h2>Finance Management</h2>
+          <p>Manage the club budget, expense requests, approvals and utilization from one financial workspace.</p>
         </div>
         <div className="actions" style={{ display: 'flex', gap: 8 }}>
           {isCommitteeUser && (
@@ -100,48 +118,17 @@ export function FinancePage() {
             </button>
           )}
           <button className="btn primary" onClick={() => setFormOpen(true)}>
-            + New Request
+            + New Expense Request
           </button>
         </div>
       </div>
 
-      <div className="kpis">
-        <div className="kpi">
-          <div className="lbl">Annual Budget</div>
-          <strong>{(budget?.approved_amount ?? 0).toLocaleString()}</strong>
-        </div>
-        <div className="kpi">
-          <div className="lbl">Approved Spend</div>
-          <strong>{spend.toLocaleString()}</strong>
-        </div>
-        <div className="kpi">
-          <div className="lbl">Available Budget</div>
-          <strong>{available.toLocaleString()}</strong>
-        </div>
-        <div className="kpi">
-          <div className="lbl">Pending Approvals</div>
-          <strong>{pending.length}</strong>
-        </div>
-      </div>
-
-      <div className="committee-term-overview">
-        <div className="committee-overline">Budget Utilization</div>
-        <div className="committee-term-overview-progress">
-          <div className="committee-term-overview-track">
-            <span style={{ width: `${utilizationPct}%` }} />
-          </div>
-          <div className="committee-term-overview-foot">
-            <strong>{utilizationPct}% utilized</strong>
-            <span>
-              {spend.toLocaleString()} of {(budget?.approved_amount ?? 0).toLocaleString()}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <div className="tabs">
+        <button className={`tab ${subTab === 'dashboard' ? 'active' : ''}`} onClick={() => setSubTab('dashboard')}>
+          Dashboard
+        </button>
         <button className={`tab ${subTab === 'requests' ? 'active' : ''}`} onClick={() => setSubTab('requests')}>
-          Requests
+          Expense Requests
         </button>
         <button className={`tab ${subTab === 'approvals' ? 'active' : ''}`} onClick={() => setSubTab('approvals')}>
           Approvals ({pending.length})
@@ -155,15 +142,49 @@ export function FinancePage() {
         <button className={`tab ${subTab === 'contingency' ? 'active' : ''}`} onClick={() => setSubTab('contingency')}>
           Contingency
         </button>
+        <button className={`tab ${subTab === 'budget' ? 'active' : ''}`} onClick={() => setSubTab('budget')}>
+          Budget
+        </button>
+        <button className={`tab ${subTab === 'exco' ? 'active' : ''}`} onClick={() => setSubTab('exco')}>
+          Exco Report
+        </button>
       </div>
+
+      {subTab === 'dashboard' && (
+        <FinanceDashboardTab
+          annualBudget={budget?.approved_amount ?? 0}
+          approvedSpendTotal={spend}
+          available={available}
+          requests={requests}
+          pendingCount={pending.length}
+          pendingSettlementCount={pendingSettlementCount}
+          onOpenRequest={setDetailId}
+          onRequestReversal={handleRequestReversal}
+          onNewRequest={() => setFormOpen(true)}
+        />
+      )}
 
       {subTab === 'requests' && (
         <>
+          <div className="committee-term-overview" style={{ marginBottom: 18 }}>
+            <div className="committee-overline">Budget Utilization</div>
+            <div className="committee-term-overview-progress">
+              <div className="committee-term-overview-track">
+                <span style={{ width: `${utilizationPct}%` }} />
+              </div>
+              <div className="committee-term-overview-foot">
+                <strong>{utilizationPct}% utilized</strong>
+                <span>
+                  {spend.toLocaleString()} of {(budget?.approved_amount ?? 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
           <div className="toolbar">
             <div className="filters">
-              <input placeholder="Search requests…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input placeholder="Search request or event..." value={search} onChange={(e) => setSearch(e.target.value)} />
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">All statuses</option>
+                <option value="">All Statuses</option>
                 {EXPENSE_STATUSES.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -172,37 +193,15 @@ export function FinancePage() {
               </select>
             </div>
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Request</th>
-                <th>Event</th>
-                <th>Requested By</th>
-                <th>Total</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => setDetailId(r.id)}>
-                  <td>{r.title || r.request_number}</td>
-                  <td>{r.event_name || '—'}</td>
-                  <td>{r.requested_by}</td>
-                  <td>{r.total_amount.toLocaleString()}</td>
-                  <td>
-                    <span className="pill plan">{r.status}</span>
-                  </td>
-                </tr>
-              ))}
-              {!filtered.length && (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>
-                    No requests match your filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {filtered.map((r) => (
+            <RequestCard
+              key={r.id}
+              request={r}
+              onOpen={() => setDetailId(r.id)}
+              onRequestReversal={() => void handleRequestReversal(r)}
+            />
+          ))}
+          {!filtered.length && <p style={{ textAlign: 'center', color: 'var(--muted)' }}>No requests match your filters.</p>}
         </>
       )}
 
@@ -300,6 +299,37 @@ export function FinancePage() {
 
       {subTab === 'settlements' && (
         <>
+          <div className="finance-settlement-head">
+            <div>
+              <h3>Actual Expense Settlement</h3>
+              <p>Finance master workspace for Event-linked and General Expense approved-vs-actual reconciliation, reimbursement/AP settlement and contingency utilization.</p>
+            </div>
+            <button className="btn ghost" onClick={() => void reloadSettlements()}>
+              ↻ Refresh
+            </button>
+          </div>
+          <div className="finance-settlement-summary">
+            <div>
+              <small>Pending Actuals</small>
+              <b>{settlementRows.filter((r) => r.status === 'Pending Actuals').length}</b>
+              <span>require action</span>
+            </div>
+            <div>
+              <small>Actuals Entered</small>
+              <b>{settlementRows.filter((r) => r.status === 'Actuals Entered').length}</b>
+              <span>ready for review</span>
+            </div>
+            <div>
+              <small>Closed</small>
+              <b>{settlementRows.filter((r) => r.status === 'Closed').length}</b>
+              <span>financially settled</span>
+            </div>
+            <div>
+              <small>Total Actual</small>
+              <b>MVR {settlementRows.reduce((s, r) => s + r.actual, 0).toLocaleString()}</b>
+              <span>event + general actuals</span>
+            </div>
+          </div>
           <div className="toolbar">
             <div className="filters">
               <select value={settlementStatusFilter} onChange={(e) => setSettlementStatusFilter(e.target.value)}>
@@ -348,7 +378,7 @@ export function FinancePage() {
                     </td>
                     <td>
                       <button className="btn ghost" onClick={() => setSettlementKey(r.key)}>
-                        Open Settlement
+                        {r.status === 'Closed' ? 'View Settlement' : 'Open Settlement'}
                       </button>
                     </td>
                   </tr>
@@ -366,6 +396,18 @@ export function FinancePage() {
       )}
 
       {subTab === 'contingency' && <ContingencyPanel />}
+
+      {subTab === 'budget' && (
+        <BudgetTab
+          budget={budget}
+          approvedSpendTotal={spend}
+          available={available}
+          isCommitteeUser={isCommitteeUser}
+          onEditBudget={() => setBudgetModalOpen(true)}
+        />
+      )}
+
+      {subTab === 'exco' && <ExcoReportTab annualBudget={budget?.approved_amount ?? 0} />}
 
       <RequestFormModal open={formOpen} onClose={() => setFormOpen(false)} onCreated={refreshAll} />
       <RequestDetailModal
