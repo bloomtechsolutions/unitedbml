@@ -19,11 +19,90 @@ export interface SendEmailPayload {
   relatedId?: string;
 }
 
+function toRecipientList(value: string | string[] | undefined): string[] {
+  if (!value) return [];
+  const list = Array.isArray(value) ? value : value.split(/[,;]/);
+  return list.map((v) => v.trim()).filter(Boolean);
+}
+
+/**
+ * Sends mail via a Power Automate HTTP-triggered Flow instead of the (unreliable, Gmail-OAuth-based)
+ * Supabase Edge Function this used to call. The Flow is expected to accept this JSON body and send
+ * the email itself (e.g. via an Office 365 Outlook / Outlook.com "Send an email (V2)" action) — see
+ * src/lib/README-power-automate-email.md for the payload contract and Flow setup notes. Delivery
+ * status still lands in email_log, written directly from the client since Power Automate has no
+ * access back into Supabase.
+ */
 export async function sendEmail(payload: SendEmailPayload) {
-  const { data, error } = await supabase.functions.invoke('send-email', { body: payload });
-  if (error) throw new Error(error.message || 'Failed to reach the email service.');
-  if (!data?.ok) throw new Error(data?.error || 'The email service rejected the request.');
-  return data as { ok: true; messageId: string; threadId: string | null; attachments: number; sentAt: string };
+  const webhookUrl = process.env.NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL;
+  if (!webhookUrl) {
+    throw new Error('Email sending is not configured — set NEXT_PUBLIC_POWER_AUTOMATE_EMAIL_WEBHOOK_URL to the Power Automate Flow URL.');
+  }
+
+  const to = toRecipientList(payload.to);
+  const cc = toRecipientList(payload.cc);
+  const attachments = payload.attachments ?? [];
+  if (!to.length || !payload.subject || (!payload.html && !payload.text)) {
+    throw new Error('Recipient, subject and email body are required.');
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let response: Response;
+  try {
+    response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to,
+        cc,
+        subject: payload.subject,
+        html: payload.html || '',
+        text: payload.text || '',
+        attachments,
+        emailType: payload.emailType || 'General',
+        relatedType: payload.relatedType || null,
+        relatedId: payload.relatedId ? String(payload.relatedId) : null,
+        sentByEmail: user?.email ?? null,
+      }),
+    });
+  } catch {
+    throw new Error('Could not reach the Power Automate webhook — check the network and the Flow URL.');
+  }
+
+  let responseBody: { ok?: boolean; error?: string; messageId?: string } | null = null;
+  try {
+    responseBody = await response.json();
+  } catch {
+    // Power Automate's default "When an HTTP request is received" trigger can respond with an
+    // empty 200/202 body unless the Flow has an explicit "Respond to a PowerApp or flow" action.
+  }
+  if (!response.ok || responseBody?.ok === false) {
+    throw new Error(responseBody?.error || `The email webhook rejected the request (HTTP ${response.status}).`);
+  }
+
+  const messageId = responseBody?.messageId || crypto.randomUUID();
+  const sentAt = new Date().toISOString();
+
+  const { error: logError } = await supabase.from('email_log').insert({
+    email_type: payload.emailType || 'General',
+    related_type: payload.relatedType || null,
+    related_id: payload.relatedId ? String(payload.relatedId) : null,
+    to_email: to.join(', '),
+    cc_email: cc.length ? cc.join(', ') : null,
+    subject: payload.subject,
+    status: 'Sent',
+    provider: 'Power Automate',
+    provider_message_id: messageId,
+    sent_by: user?.id ?? null,
+    sent_at: sentAt,
+    metadata: { provider: 'Power Automate', attachment_count: attachments.length, attachment_names: attachments.map((a) => a.filename) },
+  });
+  if (logError) console.error('email_log insert failed', logError);
+
+  return { ok: true as const, messageId, threadId: null, attachments: attachments.length, sentAt };
 }
 
 /** Downloads a Supabase Storage object and returns it as a base64 email attachment. */

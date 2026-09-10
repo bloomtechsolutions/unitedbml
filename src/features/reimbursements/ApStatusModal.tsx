@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../lib/AuthContext';
 import { AP_BATCH_STATUSES } from './types';
@@ -23,10 +23,17 @@ const GUIDANCE: Record<string, string> = {
 
 export function ApStatusModal({ batch, onClose, onSaved }: Props) {
   const { profile } = useAuth();
-  const [status, setStatus] = useState(batch?.status ?? 'Sent to AP');
+  const [status, setStatus] = useState(batch && batch.status !== 'Draft' ? batch.status : 'Sent to AP');
   const [remarks, setRemarks] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!batch) return;
+    setStatus(batch.status !== 'Draft' ? batch.status : 'Sent to AP');
+    setRemarks('');
+    setError(null);
+  }, [batch]);
 
   if (!batch) return null;
 

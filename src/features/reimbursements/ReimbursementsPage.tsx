@@ -335,11 +335,9 @@ export function ReimbursementsPage() {
                         Edit
                       </button>
                     )}
-                    {b.status !== 'Draft' && (
-                      <button className="btn ghost" onClick={() => setStatusBatch(b)}>
-                        Update Status
-                      </button>
-                    )}
+                    <button className="btn ghost" onClick={() => setStatusBatch(b)}>
+                      Update Status
+                    </button>
                   </td>
                 </tr>
               ))}
