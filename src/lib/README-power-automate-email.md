@@ -57,16 +57,26 @@ anyone holding the URL trigger it, no further auth required. That's why the app 
 - `sentByEmail` is the signed-in UnitedBML user's email address (set by `/api/send-email`, not the
   browser), for the "sent by" record.
 
-3. Add a **"Send an email (V2)"** action:
+3. Attachments need to land on **one** email as an array, not one email per attachment — so
+   **don't** wrap "Send an email (V2)" in an Apply to each (that sends a separate email per
+   attachment). Instead, build the array first with a **"Select"** action (Data Operation), placed
+   right before "Send an email (V2)":
+   - **From**: `triggerBody()?['attachments']`
+   - Switch its Map to "Text" input mode isn't needed — leave it as **Map**, and enter these two
+     key/value pairs (Power Automate auto-adds a second row once you fill the first):
+     - `Name` → `item()?['filename']`
+     - `ContentBytes` → `item()?['content']`
+   (The `content` values from the app are already base64, which is exactly what `ContentBytes`
+   expects — no decoding step needed.)
+4. Add a **"Send an email (V2)"** action:
    - **To**: `join(triggerBody()?['to'], ';')`
    - **Cc**: `join(triggerBody()?['cc'], ';')`
    - **Subject**: `triggerBody()?['subject']`
    - **Body**: `triggerBody()?['html']` (set "Is HTML" to Yes)
-   - **Attachments**: use an **Apply to each** over `triggerBody()?['attachments']`, adding one
-     attachment per item with Name = `item()?['filename']` and Content = `item()?['content']`
-     (Power Automate attachment content fields already expect base64, so no decoding step is
-     needed).
-4. Add a **"Response"** action after the send step, status `200`, body:
+   - **Attachments**: click the small **"Switch to input entire array"** icon in the top-right
+     corner of the Attachments Name/Content box (it turns the two per-item fields into one array
+     field), then set it to `body('Select')` — the output of the Select action above.
+5. Add a **"Response"** action after the send step, status `200`, body:
    ```json
    { "ok": true, "messageId": "@{outputs('Send_an_email_(V2)')?['body/id']}" }
    ```
