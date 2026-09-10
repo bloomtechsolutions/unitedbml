@@ -175,13 +175,14 @@ export async function createExpenseRequest(
 ) {
   const { subtotal, contingencyAmount, total } = computeTotals(lines);
   const id = crypto.randomUUID();
+  const requestNumber = `EXP-${Date.now().toString(36).toUpperCase()}`;
   const onLeave = payload.president_availability.toLowerCase() === 'on leave';
   const projectedEventSpend = payload.planned_event_budget > 0 ? payload.previous_approved_event_spend + total : 0;
   const overBudget = payload.planned_event_budget > 0 && projectedEventSpend > payload.planned_event_budget;
 
   const { error: requestError } = await supabase.from('expense_requests').insert({
     id,
-    request_number: `EXP-${Date.now().toString(36).toUpperCase()}`,
+    request_number: requestNumber,
     title: payload.title,
     event_id: payload.event_id,
     event_name: payload.event_name,
@@ -225,13 +226,11 @@ export async function createExpenseRequest(
   const { error: linesError } = await supabase.from('expense_lines').insert(lineRows);
   if (linesError) throw linesError;
 
-  const { error: submitError } = await supabase
-    .from('expense_requests')
-    .update({ status: onLeave ? 'Pending Final Approval' : 'Pending President Recommendation' })
-    .eq('id', id);
+  const nextStatus = onLeave ? 'Pending Final Approval' : 'Pending President Recommendation';
+  const { error: submitError } = await supabase.from('expense_requests').update({ status: nextStatus }).eq('id', id);
   if (submitError) throw submitError;
 
-  return id;
+  return { id, requestNumber, status: nextStatus };
 }
 
 async function recordApproval(payload: {

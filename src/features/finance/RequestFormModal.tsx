@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import { useToast } from '../../lib/ToastContext';
 import { committeeEffectiveAvailability } from '../committee/availability';
 import type { RequiredItem } from '../meetings/types';
+import { notifyExpenseApprover } from './emailNotifications';
 import { FINAL_APPROVER_ROLES } from './types';
 
 interface FinalApproverOption {
@@ -27,6 +29,7 @@ function todayIso(): string {
 
 interface PresidentInfo {
   name: string;
+  email: string | null;
   availability: string;
   leave_from: string | null;
   leave_to: string | null;
@@ -41,6 +44,7 @@ interface Props {
 
 export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: Props) {
   const { profile } = useAuth();
+  const toast = useToast();
   const [title, setTitle] = useState('');
   const titleTouched = useRef(false);
   const [eventId, setEventId] = useState('');
@@ -85,7 +89,7 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
       .then(({ data }) => setFinalApprovers((data ?? []).filter((m) => m.name)));
     supabase
       .from('committee_members')
-      .select('name,role,availability,leave_from,leave_to')
+      .select('name,email,role,availability,leave_from,leave_to')
       .eq('role', 'President')
       .maybeSingle()
       .then(({ data }) => setPresident(data ?? null));
@@ -181,7 +185,7 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
     setSaving(true);
     setError(null);
     try {
-      await createExpenseRequest(
+      const created = await createExpenseRequest(
         {
           title: title.trim(),
           event_id: eventId || null,
@@ -205,6 +209,25 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
       );
       await onCreated();
       onClose();
+
+      try {
+        const emailContext = {
+          id: created.id,
+          request_number: created.requestNumber,
+          title: title.trim(),
+          event_name: selectedEvent?.name ?? null,
+          requested_by: profile?.full_name || profile?.email || 'Unknown',
+          requester_role: profile?.role || '',
+          total_amount: total,
+        };
+        if (created.status === 'Pending President Recommendation' && president?.email) {
+          await notifyExpenseApprover(emailContext, president.email, president.name, 'President Recommendation');
+        } else if (created.status === 'Pending Final Approval' && approver.email) {
+          await notifyExpenseApprover(emailContext, approver.email, approver.name ?? '', 'Final Approval');
+        }
+      } catch (notifyErr) {
+        toast(notifyErr instanceof Error ? `Request submitted, but the approver email failed to send: ${notifyErr.message}` : 'Request submitted, but the approver email failed to send.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit request.');
     } finally {

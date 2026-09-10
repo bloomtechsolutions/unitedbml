@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
+import { notifyExpenseApprover, notifyExpenseDecision } from './emailNotifications';
 import type { ExpenseRequestWithLines } from './types';
 import { cancelRequest, finalDecision, presidentDecision, requestReversal } from './useFinance';
 
@@ -40,6 +41,28 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
       toast(err instanceof Error ? err.message : 'Action failed.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handlePresidentDecision = async (decision: 'recommend' | 'reject') => {
+    await presidentDecision(request, decision, comment, profile?.full_name || '', profile?.role || '');
+    try {
+      if (decision === 'recommend') {
+        await notifyExpenseApprover(request, request.final_approver_email || '', request.final_approver_name || '', 'Final Approval');
+      } else {
+        await notifyExpenseDecision(request, 'Rejected', comment, profile?.full_name || '', profile?.role || '');
+      }
+    } catch (err) {
+      console.error('Expense approval email failed', err);
+    }
+  };
+
+  const handleFinalDecision = async (decision: 'approve' | 'reject') => {
+    await finalDecision(request, decision, comment, profile?.full_name || '', profile?.role || '');
+    try {
+      await notifyExpenseDecision(request, decision === 'approve' ? 'Approved' : 'Rejected', comment, profile?.full_name || '', profile?.role || '');
+    } catch (err) {
+      console.error('Expense decision email failed', err);
     }
   };
 
@@ -151,27 +174,13 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
 
         {request.status === 'Pending President Recommendation' && isPresident && (
           <>
-            <button
-              className="btn danger"
-              disabled={busy}
-              onClick={() =>
-                void act(
-                  () => presidentDecision(request, 'reject', comment, profile?.full_name || '', profile?.role || ''),
-                  'Request rejected'
-                )
-              }
-            >
+            <button className="btn danger" disabled={busy} onClick={() => void act(() => handlePresidentDecision('reject'), 'Request rejected')}>
               Reject
             </button>
             <button
               className="btn primary"
               disabled={busy}
-              onClick={() =>
-                void act(
-                  () => presidentDecision(request, 'recommend', comment, profile?.full_name || '', profile?.role || ''),
-                  'Recommended for final approval'
-                )
-              }
+              onClick={() => void act(() => handlePresidentDecision('recommend'), 'Recommended for final approval')}
             >
               Recommend
             </button>
@@ -180,28 +189,10 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
 
         {request.status === 'Pending Final Approval' && isSelectedFinalApprover && (
           <>
-            <button
-              className="btn danger"
-              disabled={busy}
-              onClick={() =>
-                void act(
-                  () => finalDecision(request, 'reject', comment, profile?.full_name || '', profile?.role || ''),
-                  'Request rejected'
-                )
-              }
-            >
+            <button className="btn danger" disabled={busy} onClick={() => void act(() => handleFinalDecision('reject'), 'Request rejected')}>
               Reject
             </button>
-            <button
-              className="btn primary"
-              disabled={busy}
-              onClick={() =>
-                void act(
-                  () => finalDecision(request, 'approve', comment, profile?.full_name || '', profile?.role || ''),
-                  'Request approved'
-                )
-              }
-            >
+            <button className="btn primary" disabled={busy} onClick={() => void act(() => handleFinalDecision('approve'), 'Request approved')}>
               Approve
             </button>
           </>
