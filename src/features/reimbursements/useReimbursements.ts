@@ -17,7 +17,7 @@ import type {
 } from './types';
 import { apBillEvidencePath, procurementEvidencePath, uploadEvidence } from './storage';
 import { downloadAsAttachment, outlookEmailTemplate, sendEmail, type EmailAttachment } from '../../lib/email';
-import { generateApprovedExpenseNotePdf } from '../../lib/expenseNotePdf';
+import { generateApBatchApprovalNotePdf, generateApprovedExpenseNotePdf } from '../../lib/expenseNotePdf';
 
 const EVIDENCE_BUCKET = 'reimbursement-evidence';
 const MAX_EVIDENCE_BYTES = 15 * 1024 * 1024;
@@ -439,6 +439,10 @@ export async function sendApBatch(batch: ApBatchWithBills, caseItem: Procurement
     const attachments: EmailAttachment[] = [];
     if (caseItem.expense_request_id) {
       attachments.push(await generateApprovedExpenseNotePdf(caseItem.expense_request_id));
+    } else {
+      // No linked Finance expense request (e.g. a Reimbursement Manager's externally-run event) —
+      // still send AP a signed-off approval note, built from the batch's own review trail instead.
+      attachments.push(await generateApBatchApprovalNotePdf(batch, caseItem));
     }
     const evidencePath = (caseItem.data as { evidencePath?: string } | null)?.evidencePath;
     if (evidencePath) {

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { EmailAttachment } from './email';
+import type { ApBatchRow, ApBillRow, ReimbursementCaseRow } from '../types/database';
 
 /** Opens a generated (not stored) PDF/file attachment in a new tab via a short-lived blob URL. */
 export function openGeneratedAttachment(attachment: EmailAttachment) {
@@ -213,6 +214,139 @@ export async function generateApprovedExpenseNotePdf(expenseRequestId: string): 
   const base64 = doc.output('datauristring').split(',')[1];
   return {
     filename: `Approved-Expense-Note-${request.request_number ?? request.id}.pdf`,
+    contentType: 'application/pdf',
+    content: base64,
+  };
+}
+
+/** Builds a compact "AP Submission Approval Note" for reimbursement cases that never went through
+ * a Finance Expense Request (e.g. a Reimbursement Manager submitting bills for an externally-run
+ * event) — where generateApprovedExpenseNotePdf has no expense request to read from. Documents who
+ * submitted the bills, who on the committee reviewed and approved sending them, and against what
+ * approved amount, so Accounts Payable always receives a signed-off note alongside the bills. */
+export async function generateApBatchApprovalNotePdf(
+  batch: Pick<
+    ApBatchRow,
+    'id' | 'submission_ref' | 'sent_at' | 'submitted_by_manager' | 'manager_submitted_by' | 'manager_submitted_at' | 'reviewed_by' | 'reviewed_at'
+  > & { bills: Pick<ApBillRow, 'vendor_name' | 'bill_date' | 'amount'>[] },
+  caseItem: Pick<ReimbursementCaseRow, 'case_ref' | 'event_name' | 'expense_item' | 'approved_item_amount'>
+): Promise<EmailAttachment> {
+  const [{ jsPDF }, autoTableModule] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  const autoTable = autoTableModule.default;
+
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const left = 48;
+  const right = pageWidth - 48;
+  let y = 0;
+
+  doc.setFillColor(190, 24, 38);
+  doc.rect(0, 0, pageWidth, 78, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('AP SUBMISSION APPROVAL NOTE', pageWidth / 2, 40, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text('UnitedBML Finance', pageWidth / 2, 60, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
+  y = 108;
+
+  doc.setFontSize(10.5);
+  const metaField = (label: string, value: string) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(label, left, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(value, left + 130, y);
+    y += 16;
+  };
+  metaField('Submission Reference:', batch.submission_ref ?? '—');
+  metaField('Reimbursement Case:', caseItem.case_ref ?? '—');
+  metaField('Event / Activity:', caseItem.event_name || 'General (no linked event)');
+  metaField('Expense Item:', caseItem.expense_item ?? '—');
+  metaField('Approved Amount:', `MVR ${Number(caseItem.approved_item_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`);
+  y += 8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Sign-off', left, y);
+  doc.setLineWidth(0.6);
+  doc.line(left, y + 3, right, y + 3);
+  y += 22;
+
+  const boxWidth = (right - left - 8) / 2;
+  const boxHeight = 60;
+  const boxes = [
+    {
+      label: batch.submitted_by_manager ? 'SUBMITTED BY (REIMBURSEMENT MANAGER)' : 'SUBMITTED BY',
+      name: batch.manager_submitted_by || '—',
+      at: fmtDateTime(batch.manager_submitted_at),
+    },
+    {
+      label: 'REVIEWED & APPROVED BY (COMMITTEE)',
+      name: batch.reviewed_by || '—',
+      at: fmtDateTime(batch.reviewed_at),
+    },
+  ];
+  boxes.forEach((box, i) => {
+    const x = left + i * (boxWidth + 8);
+    doc.setDrawColor(210, 210, 210);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(x, y, boxWidth, boxHeight, 3, 3);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text(box.label, x + 8, y + 16);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10.5);
+    doc.text(box.name, x + 8, y + 32);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(140, 140, 140);
+    doc.text(box.at, x + 8, y + 48);
+    doc.setTextColor(0, 0, 0);
+  });
+  y += boxHeight + 26;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Bills Submitted', left, y);
+  y += 8;
+
+  const billRows = batch.bills.map((b) => [
+    b.vendor_name || '',
+    fmtDate(b.bill_date),
+    Number(b.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+  ]);
+  const total = batch.bills.reduce((s, b) => s + Number(b.amount ?? 0), 0);
+  billRows.push(['TOTAL', '', total.toLocaleString(undefined, { minimumFractionDigits: 2 })]);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Vendor', 'Bill Date', 'Amount MVR']],
+    body: billRows,
+    margin: { left, right: pageWidth - right },
+    styles: { fontSize: 9.5, cellPadding: 5 },
+    headStyles: { fillColor: [230, 230, 230], textColor: [30, 30, 30], fontStyle: 'bold' },
+    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+    didParseCell: (data) => {
+      if (data.row.index === billRows.length - 1) data.cell.styles.fontStyle = 'bold';
+    },
+  });
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(110, 110, 110);
+  const footNote = doc.splitTextToSize(
+    'This submission was reviewed and approved by the committee within UnitedBML prior to being sent to Accounts Payable for processing and payment.',
+    right - left
+  );
+  doc.text(footNote, left, y);
+
+  const base64 = doc.output('datauristring').split(',')[1];
+  return {
+    filename: `AP-Approval-Note-${batch.submission_ref ?? batch.id}.pdf`,
     contentType: 'application/pdf',
     content: base64,
   };
