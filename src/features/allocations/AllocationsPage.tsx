@@ -85,8 +85,7 @@ export function AllocationsPage() {
         </div>
       </div>
       <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: -6, marginBottom: 14 }}>
-        Pre-approved activities run outside UnitedBML but funded from the UBML account — e.g. Fun with Team, UBML
-        Allowance, Women's Day, Men's Day, Year End Activities. Log Finance's monthly actuals here for visibility.
+        Pre-approved activities run outside UnitedBML but funded from the UBML account.
       </p>
 
       <div className="toolbar" style={{ marginBottom: 14 }}>
