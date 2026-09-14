@@ -175,22 +175,22 @@ export function DocumentsPage() {
         </div>
       </div>
 
-      <div className="kpis">
-        <div className="kpi">
-          <div className="lbl">Total Documents</div>
-          <strong>{documents.length}</strong>
+      <div className="ub-kpi-strip">
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{documents.length}</span>
+          <span className="ub-kpi-strip-label">Total Documents</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Event Folders</div>
-          <strong>{folders.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{folders.length}</span>
+          <span className="ub-kpi-strip-label">Event Folders</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Approved Notes</div>
-          <strong>{notes.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{notes.length}</span>
+          <span className="ub-kpi-strip-label">Approved Notes</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Linked Evidence</div>
-          <strong>{evidence.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{evidence.length}</span>
+          <span className="ub-kpi-strip-label">Linked Evidence</span>
         </div>
       </div>
 
