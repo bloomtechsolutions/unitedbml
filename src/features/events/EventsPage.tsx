@@ -6,7 +6,6 @@ import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useToast } from '../../lib/ToastContext';
 import type { EventRow } from '../../types/database';
 import { useEventFinanceSummary } from '../finance/useFinance';
-import { EventCalendar } from './EventCalendar';
 import { EventDetailModal } from './EventDetailModal';
 import { EventFormModal } from './EventFormModal';
 import { eventLifecycle, eventPreparationProgress, eventReadiness, type FinanceStatus } from './lifecycle';
@@ -15,7 +14,7 @@ import { createEvent, deleteEvent, updateEvent, useCommitteeMembers, useEventTyp
 
 const NO_FINANCE: FinanceStatus = { hasApproved: false, hasPending: false };
 
-type SubTab = 'overview' | 'assignments' | 'attendance' | 'calendar' | 'archive' | 'info';
+type SubTab = 'overview' | 'assignments' | 'attendance' | 'archive' | 'info';
 
 const EVENTS_INFO = [
   {
@@ -35,8 +34,8 @@ const EVENTS_INFO = [
     a: "Internal events run the full UnitedBML workflow end-to-end. External events are ones staff attend on the club's behalf elsewhere — they skip the Finance Requests workflow and instead use a Reimbursement Manager to submit bills for approved reimbursement, reviewed by the committee in Reimbursements.",
   },
   {
-    q: 'What is the Event Calendar?',
-    a: "A year-at-a-glance view of every planned activity. Click a month chip to jump straight to it, click any day to see what's on, and click an activity to open its full detail — colors match the same lifecycle stages shown everywhere else.",
+    q: 'Where is the Event Calendar?',
+    a: "It's its own page now — Events → Event Calendar in the sidebar. A year-at-a-glance view of every planned activity plus Maldives public holidays, with support for lightweight placeholder activities that don't have a full Event yet.",
   },
   {
     q: 'What does Archive show?',
@@ -65,8 +64,6 @@ export function EventsPage() {
     if (searchParams.get('new') === '1') setFormOpen(true);
     const openId = searchParams.get('open');
     if (openId) setDetailId(openId);
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'calendar') setSubTab('calendar');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -191,16 +188,14 @@ export function EventsPage() {
       </div>
 
       <div className="tabs">
-        {(['overview', 'assignments', 'attendance', 'calendar', 'archive', 'info'] as SubTab[]).map((t) => (
+        {(['overview', 'assignments', 'attendance', 'archive', 'info'] as SubTab[]).map((t) => (
           <button key={t} className={`tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
-            {t === 'overview' ? 'Event Overview' : t === 'info' ? 'Info' : t === 'calendar' ? 'Event Calendar' : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'overview' ? 'Event Overview' : t === 'info' ? 'Info' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
 
       {subTab === 'info' && <PageInfoPanel sections={EVENTS_INFO} />}
-
-      {subTab === 'calendar' && <EventCalendar events={enriched} onOpenEvent={setDetailId} />}
 
       {subTab === 'overview' && (
         <>

@@ -931,8 +931,43 @@ export interface Database {
         Insert: Partial<StandingAllocationEntryRow>;
         Update: Partial<StandingAllocationEntryRow>;
       };
+      event_planned_activities: {
+        Row: PlannedActivityRow;
+        Insert: Partial<PlannedActivityRow>;
+        Update: Partial<PlannedActivityRow>;
+      };
+      public_holidays: {
+        Row: PublicHolidayRow;
+        Insert: Partial<PublicHolidayRow>;
+        Update: Partial<PublicHolidayRow>;
+      };
     };
   };
+}
+
+export interface PlannedActivityRow {
+  id: string;
+  name: string;
+  planned_date: string;
+  event_type: string | null;
+  notes: string | null;
+  promoted_event_id: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type HolidayType = 'Public' | 'Observance';
+
+export interface PublicHolidayRow {
+  id: string;
+  holiday_date: string;
+  name: string;
+  type: HolidayType;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type AllocationCadence = 'Monthly' | 'Annual';

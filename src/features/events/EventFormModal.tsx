@@ -35,9 +35,11 @@ interface Props {
   eventTypes: string[];
   coordinators: CommitteeMemberOption[];
   editing?: EventRow | null;
+  /** Prefills the create form (e.g. promoting a calendar placeholder to a real event). Ignored when editing. */
+  initialValues?: Partial<Pick<EventFormValues, 'name' | 'event_date' | 'description'>>;
 }
 
-export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators, editing }: Props) {
+export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators, editing, initialValues }: Props) {
   const [values, setValues] = useState<EventFormValues>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -56,9 +58,10 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
         description: editing.description ?? '',
       });
     } else {
-      setValues(EMPTY);
+      setValues({ ...EMPTY, ...initialValues });
     }
     setFormError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
 
   const handleSubmit = async () => {

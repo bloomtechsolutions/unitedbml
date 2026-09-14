@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { EventRow } from '../../types/database';
+import type { EventRow, PlannedActivityRow, PublicHolidayRow } from '../../types/database';
 import { localTodayIso, type EventLifecycle } from './lifecycle';
 
 interface CalendarEntry {
@@ -11,7 +11,13 @@ interface CalendarEntry {
 
 interface Props {
   events: CalendarEntry[];
+  placeholders: PlannedActivityRow[];
+  holidays: PublicHolidayRow[];
   onOpenEvent: (id: string) => void;
+  onAddPlaceholder: (date: string) => void;
+  onPromotePlaceholder: (activity: PlannedActivityRow) => void;
+  onDeletePlaceholder: (id: string) => void;
+  onManageHolidays: () => void;
 }
 
 const LIFECYCLE_PILL: Record<EventLifecycle, string> = {
@@ -34,14 +40,23 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-export function EventCalendar({ events, onOpenEvent }: Props) {
+export function EventCalendar({
+  events,
+  placeholders,
+  holidays,
+  onOpenEvent,
+  onAddPlaceholder,
+  onPromotePlaceholder,
+  onDeletePlaceholder,
+  onManageHolidays,
+}: Props) {
   const todayIso = localTodayIso();
   const todayDate = new Date(`${todayIso}T00:00:00`);
 
   const [cursor, setCursor] = useState({ year: todayDate.getFullYear(), month: todayDate.getMonth() });
   const [selectedDate, setSelectedDate] = useState<string | null>(todayIso);
 
-  const byDate = useMemo(() => {
+  const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>();
     for (const entry of events) {
       const d = entry.event.event_date;
@@ -53,6 +68,27 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
     return map;
   }, [events]);
 
+  const placeholdersByDate = useMemo(() => {
+    const map = new Map<string, PlannedActivityRow[]>();
+    for (const p of placeholders) {
+      if (p.promoted_event_id) continue;
+      const arr = map.get(p.planned_date) ?? [];
+      arr.push(p);
+      map.set(p.planned_date, arr);
+    }
+    return map;
+  }, [placeholders]);
+
+  const holidaysByDate = useMemo(() => {
+    const map = new Map<string, PublicHolidayRow[]>();
+    for (const h of holidays) {
+      const arr = map.get(h.holiday_date) ?? [];
+      arr.push(h);
+      map.set(h.holiday_date, arr);
+    }
+    return map;
+  }, [holidays]);
+
   const yearCounts = useMemo(() => {
     const counts = new Array(12).fill(0);
     for (const entry of events) {
@@ -61,8 +97,13 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
       const [y, m] = d.split('-').map(Number);
       if (y === cursor.year) counts[m - 1] += 1;
     }
+    for (const p of placeholders) {
+      if (p.promoted_event_id) continue;
+      const [y, m] = p.planned_date.split('-').map(Number);
+      if (y === cursor.year) counts[m - 1] += 1;
+    }
     return counts;
-  }, [events, cursor.year]);
+  }, [events, placeholders, cursor.year]);
   const maxYearCount = Math.max(1, ...yearCounts);
 
   const years = useMemo(() => {
@@ -71,8 +112,9 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
       const d = entry.event.event_date;
       if (d) set.add(Number(d.slice(0, 4)));
     }
+    for (const h of holidays) set.add(Number(h.holiday_date.slice(0, 4)));
     return Array.from(set).sort((a, b) => a - b);
-  }, [events, todayDate]);
+  }, [events, holidays, todayDate]);
 
   const grid = useMemo(() => {
     const first = new Date(cursor.year, cursor.month, 1);
@@ -119,30 +161,37 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
     });
   };
 
-  const selectedEvents = selectedDate ? byDate.get(selectedDate) ?? [] : [];
+  const selectedEvents = selectedDate ? eventsByDate.get(selectedDate) ?? [] : [];
+  const selectedPlaceholders = selectedDate ? placeholdersByDate.get(selectedDate) ?? [] : [];
+  const selectedHolidays = selectedDate ? holidaysByDate.get(selectedDate) ?? [] : [];
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-        {MONTH_SHORT.map((m, i) => {
-          const count = yearCounts[i];
-          const active = i === cursor.month;
-          return (
-            <button
-              key={m}
-              onClick={() => setCursor((c) => ({ ...c, month: i }))}
-              className="ub-cal-month-chip"
-              data-active={active || undefined}
-              title={`${count} ${count === 1 ? 'activity' : 'activities'} in ${MONTH_NAMES[i]}`}
-            >
-              <span>{m}</span>
-              <span className="ub-cal-month-bar">
-                <span style={{ width: `${Math.round((count / maxYearCount) * 100)}%` }} />
-              </span>
-              <span className="ub-cal-month-count">{count}</span>
-            </button>
-          );
-        })}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1 }}>
+          {MONTH_SHORT.map((m, i) => {
+            const count = yearCounts[i];
+            const active = i === cursor.month;
+            return (
+              <button
+                key={m}
+                onClick={() => setCursor((c) => ({ ...c, month: i }))}
+                className="ub-cal-month-chip"
+                data-active={active || undefined}
+                title={`${count} ${count === 1 ? 'activity' : 'activities'} in ${MONTH_NAMES[i]}`}
+              >
+                <span>{m}</span>
+                <span className="ub-cal-month-bar">
+                  <span style={{ width: `${Math.round((count / maxYearCount) * 100)}%` }} />
+                </span>
+                <span className="ub-cal-month-count">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn ghost" onClick={onManageHolidays} style={{ whiteSpace: 'nowrap' }}>
+          🎌 Manage Holidays
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2.2fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
@@ -186,9 +235,12 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
           </div>
           <div className="ub-cal-grid">
             {grid.map((cell) => {
-              const dayEvents = byDate.get(cell.iso) ?? [];
+              const dayEvents = eventsByDate.get(cell.iso) ?? [];
+              const dayPlaceholders = placeholdersByDate.get(cell.iso) ?? [];
+              const dayHolidays = holidaysByDate.get(cell.iso) ?? [];
               const isToday = cell.iso === todayIso;
               const isSelected = cell.iso === selectedDate;
+              const totalItems = dayEvents.length + dayPlaceholders.length;
               return (
                 <button
                   key={cell.iso}
@@ -196,16 +248,26 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
                   data-in-month={cell.inMonth || undefined}
                   data-today={isToday || undefined}
                   data-selected={isSelected || undefined}
+                  data-holiday={dayHolidays.length ? true : undefined}
                   onClick={() => setSelectedDate(cell.iso)}
                 >
-                  <span className="ub-cal-cell-day">{cell.day}</span>
+                  <span className="ub-cal-cell-top">
+                    <span className="ub-cal-cell-day">{cell.day}</span>
+                    {dayHolidays.length > 0 && <span className="ub-cal-holiday-dot" title={dayHolidays.map((h) => h.name).join(', ')} />}
+                  </span>
                   <span className="ub-cal-cell-chips">
                     {dayEvents.slice(0, 2).map((e) => (
                       <span key={e.event.id} className={`ub-cal-chip ${LIFECYCLE_PILL[e.lifecycle]}`}>
                         {e.event.name}
                       </span>
                     ))}
-                    {dayEvents.length > 2 && <span className="ub-cal-chip-more">+{dayEvents.length - 2} more</span>}
+                    {dayEvents.length <= 2 &&
+                      dayPlaceholders.slice(0, 2 - dayEvents.length).map((p) => (
+                        <span key={p.id} className="ub-cal-chip ub-cal-chip-placeholder">
+                          {p.name}
+                        </span>
+                      ))}
+                    {totalItems > 2 && <span className="ub-cal-chip-more">+{totalItems - 2} more</span>}
                   </span>
                 </button>
               );
@@ -214,12 +276,16 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
 
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--ub-border-2)' }}>
             {(Object.keys(LIFECYCLE_PILL) as EventLifecycle[]).map((stage) => (
-              <div key={stage} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ub-ink-faint)' }}>
-                <span className={`ub-pill ${LIFECYCLE_PILL[stage]}`} style={{ padding: '2px 8px' }}>
-                  {stage}
-                </span>
-              </div>
+              <span key={stage} className={`ub-pill ${LIFECYCLE_PILL[stage]}`} style={{ padding: '2px 8px', fontSize: 11 }}>
+                {stage}
+              </span>
             ))}
+            <span className="ub-pill ub-cal-chip-placeholder" style={{ padding: '2px 8px', fontSize: 11 }}>
+              Planned (not yet an event)
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--ub-ink-faint)' }}>
+              <span className="ub-cal-holiday-dot" /> Public holiday
+            </span>
           </div>
         </div>
 
@@ -227,13 +293,38 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
           <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ub-ink-faint)', textTransform: 'uppercase', marginBottom: 2 }}>
             {selectedDate === todayIso ? 'Today' : selectedDate}
           </div>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
             {selectedDate
               ? new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
               : 'Pick a day'}
           </h3>
-          {!selectedEvents.length && <p className="ub-empty">No activities scheduled this day.</p>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+          {selectedHolidays.map((h) => (
+            <div
+              key={h.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: 'var(--ub-danger-dark)',
+                background: 'var(--ub-danger-soft)',
+                borderRadius: 8,
+                padding: '6px 10px',
+                marginBottom: 8,
+              }}
+            >
+              🎌 {h.name} <span style={{ fontWeight: 500, opacity: 0.8 }}>({h.type})</span>
+            </div>
+          ))}
+
+          {!selectedEvents.length && !selectedPlaceholders.length && (
+            <p className="ub-empty" style={{ marginTop: 8 }}>
+              No activities scheduled this day.
+            </p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
             {selectedEvents.map((e) => (
               <button
                 key={e.event.id}
@@ -257,7 +348,38 @@ export function EventCalendar({ events, onOpenEvent }: Props) {
                 </div>
               </button>
             ))}
+            {selectedPlaceholders.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  border: '1px dashed var(--ub-border)',
+                  borderRadius: 10,
+                  padding: '10px 12px',
+                  background: 'var(--ub-surface-2)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{p.name}</span>
+                  <span className="ub-pill ub-cal-chip-placeholder">Planned</span>
+                </div>
+                {p.notes && <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginTop: 4 }}>{p.notes}</div>}
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button className="btn primary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => onPromotePlaceholder(p)}>
+                    Promote to Event
+                  </button>
+                  <button className="btn ghost" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => onDeletePlaceholder(p.id)}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
+
+          {selectedDate && (
+            <button className="ub-btn ub-btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => onAddPlaceholder(selectedDate)}>
+              + Add Planned Activity
+            </button>
+          )}
         </div>
       </div>
     </div>

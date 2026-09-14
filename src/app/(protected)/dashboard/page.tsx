@@ -116,7 +116,7 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
           <span className="ub-kpi-strip-value">{dash.metrics.openTasks}</span>
           <span className="ub-kpi-strip-label">Open Tasks</span>
         </Link>
-        <Link href="/events?tab=calendar" className="ub-kpi-strip-item">
+        <Link href="/events-calendar" className="ub-kpi-strip-item">
           <span className="ub-kpi-strip-value" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <CalendarIcon />
             {dash.metrics.upcoming30}
