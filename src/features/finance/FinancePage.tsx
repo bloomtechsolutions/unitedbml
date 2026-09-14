@@ -111,10 +111,9 @@ export function FinancePage() {
       <div className="page-head">
         <div>
           <h2>Finance Management</h2>
-          <p>Manage the club budget, expense requests, approvals and utilization from one financial workspace.</p>
         </div>
         <div className="actions" style={{ display: 'flex', gap: 8 }}>
-          {isCommitteeUser && (
+          {profile?.role === 'Treasurer' && (
             <button className="btn ghost" onClick={() => setBudgetModalOpen(true)}>
               Edit Annual Budget
             </button>
@@ -166,6 +165,7 @@ export function FinancePage() {
           settlementStatusByKey={settlementStatusByKey}
           settlementKeyForRequest={settlementKeyForExpenseRequest}
           onEnterActual={setSettlementKey}
+          onViewAll={() => setSubTab('requests')}
         />
       )}
 

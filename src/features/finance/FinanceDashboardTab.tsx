@@ -4,9 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { RequestCard } from './RequestCard';
 import type { ExpenseRequestWithLines } from './types';
-import { EXPENSE_STATUSES } from './types';
 
 type BudgetMode = 'approved' | 'actual' | 'planned';
+
+const MODE_COLOR: Record<BudgetMode, string> = { approved: '#4d57d9', actual: '#00a98e', planned: '#00b5e4' };
+
+function ringColor(pct: number): string {
+  if (pct >= 90) return '#e01b22';
+  if (pct >= 70) return '#e08a1b';
+  return '#00a98e';
+}
 
 interface Props {
   annualBudget: number;
@@ -21,6 +28,7 @@ interface Props {
   settlementStatusByKey: Map<string, string>;
   settlementKeyForRequest: (request: ExpenseRequestWithLines) => string;
   onEnterActual: (settlementKey: string) => void;
+  onViewAll: () => void;
 }
 
 export function FinanceDashboardTab({
@@ -36,12 +44,10 @@ export function FinanceDashboardTab({
   settlementStatusByKey,
   settlementKeyForRequest,
   onEnterActual,
+  onViewAll,
 }: Props) {
   const [mode, setMode] = useState<BudgetMode>('approved');
   const [eventTotals, setEventTotals] = useState({ planned: 0, actual: 0 });
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('all');
 
   useEffect(() => {
     supabase
@@ -64,32 +70,18 @@ export function FinanceDashboardTab({
       .reduce((s, r) => s + (r.total_amount || 0), 0);
   }, [requests]);
 
-  const primaryValue = mode === 'approved' ? approvedSpendTotal : mode === 'actual' ? eventTotals.actual : eventTotals.planned;
-  const primaryLabel = mode === 'approved' ? 'Approved Spend' : mode === 'actual' ? 'Actual Expense' : 'Planned Budget';
+  const byMode: Record<BudgetMode, { label: string; value: number }> = {
+    approved: { label: 'Approved Spend', value: approvedSpendTotal },
+    actual: { label: 'Actual Expense', value: eventTotals.actual },
+    planned: { label: 'Planned Budget', value: eventTotals.planned },
+  };
+  const primaryValue = byMode[mode].value;
+  const primaryLabel = byMode[mode].label;
   const pct = annualBudget ? Math.min(100, Math.round((primaryValue / annualBudget) * 100)) : 0;
   const ringDeg = (pct / 100) * 360;
+  const ringHue = ringColor(pct);
 
-  const filteredRequests = useMemo(() => {
-    const today = new Date();
-    return requests.filter((r) => {
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        (r.title || '').toLowerCase().includes(q) ||
-        (r.event_name || '').toLowerCase().includes(q) ||
-        (r.requested_by || '').toLowerCase().includes(q);
-      const matchesStatus = !statusFilter || r.status === statusFilter;
-      let matchesDate = true;
-      if (r.request_date && dateFilter !== 'all') {
-        const d = new Date(r.request_date);
-        if (dateFilter === '7') matchesDate = today.getTime() - d.getTime() <= 7 * 86400000;
-        else if (dateFilter === '30') matchesDate = today.getTime() - d.getTime() <= 30 * 86400000;
-        else if (dateFilter === 'month') matchesDate = r.request_date.slice(0, 7) === today.toISOString().slice(0, 7);
-        else if (dateFilter === 'year') matchesDate = r.request_date.slice(0, 4) === String(today.getFullYear());
-      }
-      return matchesSearch && matchesStatus && matchesDate;
-    });
-  }, [requests, search, statusFilter, dateFilter]);
+  const recentRequests = useMemo(() => requests.slice(0, 5), [requests]);
 
   return (
     <div className="finance-dashboard-stack">
@@ -103,12 +95,15 @@ export function FinanceDashboardTab({
           </div>
           <div className="budget-mode-tabs">
             <button className={mode === 'approved' ? 'active' : ''} onClick={() => setMode('approved')}>
+              <span className="budget-mode-dot" style={{ background: MODE_COLOR.approved }} />
               Approved
             </button>
             <button className={mode === 'actual' ? 'active' : ''} onClick={() => setMode('actual')}>
+              <span className="budget-mode-dot" style={{ background: MODE_COLOR.actual }} />
               Actual
             </button>
             <button className={mode === 'planned' ? 'active' : ''} onClick={() => setMode('planned')}>
+              <span className="budget-mode-dot" style={{ background: MODE_COLOR.planned }} />
               Planned
             </button>
           </div>
@@ -117,14 +112,16 @@ export function FinanceDashboardTab({
           <div>
             <div
               className="budget-ring"
-              style={{ background: `conic-gradient(var(--primary) 0deg, var(--primary2) ${ringDeg}deg, #e9edf5 ${ringDeg}deg)` }}
+              style={{ background: `conic-gradient(${ringHue} 0deg, ${ringHue} ${ringDeg}deg, #e9edf5 ${ringDeg}deg)`, transition: 'background 0.5s ease' }}
             >
               <div className="budget-ring-center">
-                <b>{pct}%</b>
+                <b style={{ color: ringHue }}>{pct}%</b>
                 <small>{primaryLabel} vs annual budget</small>
               </div>
             </div>
-            <div className="budget-ring-caption">Interactive budget view</div>
+            <div className="budget-ring-caption">
+              MVR {primaryValue.toLocaleString()} of MVR {annualBudget.toLocaleString()}
+            </div>
           </div>
           <div className="budget-breakdown">
             <div className="budget-headline">
@@ -144,6 +141,20 @@ export function FinanceDashboardTab({
                 <small>This Month</small>
                 <strong>MVR {thisMonthTotal.toLocaleString()}</strong>
               </div>
+            </div>
+            <div className="budget-compare">
+              {(['approved', 'actual', 'planned'] as BudgetMode[]).map((m) => {
+                const barPct = annualBudget ? Math.min(100, Math.round((byMode[m].value / annualBudget) * 100)) : 0;
+                return (
+                  <button key={m} className={`budget-compare-row ${mode === m ? 'active' : ''}`} onClick={() => setMode(m)}>
+                    <span className="budget-compare-label">{byMode[m].label}</span>
+                    <span className="budget-compare-track">
+                      <span className="budget-compare-fill" style={{ width: `${barPct}%`, background: MODE_COLOR[m] }} />
+                    </span>
+                    <span className="budget-compare-value">MVR {byMode[m].value.toLocaleString()}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -165,35 +176,20 @@ export function FinanceDashboardTab({
 
       <div className="card finance-requests-card">
         <div className="card-header">
-          <h3>Recent Expense Requests</h3>
-          <button className="btn soft" onClick={onNewRequest}>
-            + New Request
-          </button>
+          <div>
+            <h3>Recent Expense Requests</h3>
+            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Last {recentRequests.length} submitted, most recent first.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn ghost" onClick={onViewAll}>
+              View All
+            </button>
+            <button className="btn soft" onClick={onNewRequest}>
+              + New Request
+            </button>
+          </div>
         </div>
-        <div className="finance-dashboard-filters">
-          <input
-            placeholder="Search request, event or requester..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">All Statuses</option>
-            {EXPENSE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}>
-            <option value="all">All Dates</option>
-            <option value="7">Last 7 Days</option>
-            <option value="30">Last 30 Days</option>
-            <option value="month">This Month</option>
-            <option value="year">This Year</option>
-          </select>
-          <div className="summary">{filteredRequests.length} requests</div>
-        </div>
-        {filteredRequests.slice(0, 8).map((r) => (
+        {recentRequests.map((r) => (
           <RequestCard
             key={r.id}
             request={r}
@@ -203,7 +199,7 @@ export function FinanceDashboardTab({
             onEnterActual={() => onEnterActual(settlementKeyForRequest(r))}
           />
         ))}
-        {!filteredRequests.length && <p style={{ color: 'var(--muted)', fontSize: 12 }}>No requests match your filters.</p>}
+        {!recentRequests.length && <p style={{ color: 'var(--muted)', fontSize: 12 }}>No expense requests yet.</p>}
       </div>
     </div>
   );
