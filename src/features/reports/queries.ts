@@ -473,13 +473,12 @@ export async function eventsMaster(): Promise<ReportResult> {
 
 export async function attendanceSummary(): Promise<ReportResult> {
   const [events, attendance] = await Promise.all([
-    all<{ id: string; name: string; event_date: string | null; expected_participants: number }>('events'),
+    all<{ id: string; name: string; event_date: string | null }>('events'),
     all<{ event_id: string; attended: boolean }>('event_attendance'),
   ]);
   return {
     columns: [
       col('name', 'Event', text),
-      col('expected', 'Expected', num),
       col('recorded', 'Recorded', num),
       col('attended', 'Attended', num),
       col('rate_pct', 'Attendance %', num),
@@ -493,7 +492,6 @@ export async function attendanceSummary(): Promise<ReportResult> {
         _eventName: e.name,
         _status: null,
         name: e.name,
-        expected: e.expected_participants,
         recorded: roster.length,
         attended,
         rate_pct: roster.length ? Math.round((attended / roster.length) * 1000) / 10 : 0,
