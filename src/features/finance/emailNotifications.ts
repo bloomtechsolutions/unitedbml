@@ -12,6 +12,27 @@ interface ExpenseRequestEmailContext {
   requested_by: string | null;
   requester_role: string | null;
   total_amount: number | null;
+  purpose?: string | null;
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** The most recent President Recommendation decision recorded for this request, if any —
+ * looked up from expense_approvals rather than the expense_requests row itself, since that's
+ * the only place a reliable decision timestamp (decided_at) is actually stored. */
+async function latestPresidentRecommendation(expenseRequestId: string) {
+  const { data } = await supabase
+    .from('expense_approvals')
+    .select('approver_name,approver_role,comment,decision,decided_at')
+    .eq('expense_request_id', expenseRequestId)
+    .eq('stage', 'President')
+    .order('decided_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data;
 }
 
 interface ExpenseLineForEmail {
@@ -41,14 +62,30 @@ export async function notifyExpenseApprover(
   const validLines = lines.filter((l) => l.description?.trim());
   const subtotal = validLines.reduce((sum, l) => sum + (l.quantity || 0) * (l.rate || 0), 0);
   const contingency = Math.round(subtotal * 0.05 * 100) / 100;
+
+  const rows = [
+    { label: 'Request', value: `${request.request_number ?? ''} — ${request.title ?? ''}` },
+    { label: 'Event / Activity', value: request.event_name || 'General Club Expense' },
+    { label: 'Requested By', value: `${request.requested_by ?? ''} (${request.requester_role ?? ''})` },
+    ...(request.purpose ? [{ label: 'Description', value: request.purpose }] : []),
+  ];
+
+  if (stage === 'Final Approval') {
+    const recommendation = await latestPresidentRecommendation(request.id);
+    if (recommendation) {
+      rows.push(
+        { label: 'President Recommendation', value: recommendation.decision || 'Recommended' },
+        { label: 'Recommended By', value: `${recommendation.approver_name ?? ''} (${recommendation.approver_role ?? ''})` },
+        { label: 'Recommended At', value: formatDateTime(recommendation.decided_at) },
+        ...(recommendation.comment ? [{ label: 'President Comment', value: recommendation.comment }] : [])
+      );
+    }
+  }
+
   const html = outlookEmailTemplate({
     heading: stage === 'President Recommendation' ? 'President Recommendation Required' : 'Final Approval Required',
     intro: `Dear ${approverName || 'Sir/Madam'}, an expense request is waiting on your decision.`,
-    rows: [
-      { label: 'Request', value: `${request.request_number ?? ''} — ${request.title ?? ''}` },
-      { label: 'Event / Activity', value: request.event_name || 'General Club Expense' },
-      { label: 'Requested By', value: `${request.requested_by ?? ''} (${request.requester_role ?? ''})` },
-    ],
+    rows,
     itemsTable: validLines.length
       ? {
           headers: ['Item', 'Qty', 'Rate (MVR)', 'Amount (MVR)'],

@@ -219,6 +219,7 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
           requested_by: profile?.full_name || profile?.email || 'Unknown',
           requester_role: profile?.role || '',
           total_amount: total,
+          purpose: purpose || null,
         };
         if (created.status === 'Pending President Recommendation' && president?.email) {
           await notifyExpenseApprover(emailContext, president.email, president.name, 'President Recommendation', validLines);
