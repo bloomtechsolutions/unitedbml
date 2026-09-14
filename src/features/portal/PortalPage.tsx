@@ -7,7 +7,6 @@ import { useToast } from '../../lib/ToastContext';
 import { checkInToMeeting } from '../meetings/useMeetings';
 import { canCheckInToMeeting } from '../meetings/status';
 import { useMyMeetings } from '../dashboard/useMyMeetings';
-import { leaderboardLevel } from '../leaderboard/types';
 import { useLeaderboard } from '../leaderboard/useLeaderboard';
 import { ReimbursementFormModal } from './ReimbursementFormModal';
 import {
@@ -22,6 +21,8 @@ function normalize(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
 
+const ACTIVITY_ICON: Record<string, string> = { event: '◉', task: '✓', win: '★' };
+
 export function PortalPage() {
   const { profile, session } = useAuth();
   const toast = useToast();
@@ -35,12 +36,9 @@ export function PortalPage() {
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [reimbModalOpen, setReimbModalOpen] = useState(false);
 
-  const sortedLeaderboard = [...leaderboardRows].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
   const myKey = normalize(profile?.member_uid) ? `uid:${normalize(profile?.member_uid)}` : normalize(profile?.email) ? `email:${normalize(profile?.email)}` : `name:${normalize(profile?.full_name)}`;
-  const myRow = sortedLeaderboard.find((r) => r.key === myKey || normalize(r.name) === normalize(profile?.full_name)) ?? null;
-  const myRank = myRow ? sortedLeaderboard.indexOf(myRow) + 1 : null;
-  const { level, next, floor, ceiling } = leaderboardLevel(myRow?.points ?? 0);
-  const progressPct = ceiling ? Math.min(100, (((myRow?.points ?? 0) - floor) / (ceiling - floor)) * 100) : 100;
+  const myRow = leaderboardRows.find((r) => r.key === myKey || normalize(r.name) === normalize(profile?.full_name)) ?? null;
+  const myActivity = myRow?.activity ?? [];
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -70,7 +68,7 @@ export function PortalPage() {
       >
         <div style={{ fontSize: 12.5, opacity: 0.85 }}>MY HUB</div>
         <h2 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0' }}>Welcome{profile?.full_name ? `, ${profile.full_name}` : ''}</h2>
-        <p style={{ fontSize: 13.5, opacity: 0.9 }}>Your tasks, approvals, meetings and standing — in one place.</p>
+        <p style={{ fontSize: 13.5, opacity: 0.9 }}>Your tasks, approvals, meetings and activity — in one place.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
@@ -195,46 +193,44 @@ export function PortalPage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div className="ub-card">
-            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>My Standing</h3>
-            <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 14 }}>Your points on the Leaderboard.</p>
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Recent Activity</h3>
+            <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 14 }}>Your own event attendance, tasks and achievements.</p>
             {leaderboardLoading && <p style={{ fontSize: 13, color: 'var(--ub-ink-faint)' }}>Loading…</p>}
-            {!leaderboardLoading && (
-              <>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 28, fontWeight: 700 }}>{myRow?.points ?? 0}</span>
-                  <span style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)' }}>points</span>
-                </div>
-                <div style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', marginBottom: 12 }}>
-                  {myRank ? `Rank #${myRank} of ${sortedLeaderboard.length}` : 'Not yet ranked'} · {level}
-                </div>
-                <div style={{ height: 6, borderRadius: 99, background: 'var(--ub-surface-2)', overflow: 'hidden', marginBottom: 14 }}>
-                  <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--ub-accent)' }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 16 }}>{myRow?.events ?? 0}</div>
-                    <div style={{ color: 'var(--ub-ink-faint)' }}>Events Attended</div>
+            {!leaderboardLoading && !myActivity.length && <p className="ub-empty">No activity recorded yet.</p>}
+            {!leaderboardLoading &&
+              myActivity.slice(0, 8).map((a, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '9px 4px',
+                    borderBottom: '1px solid var(--ub-border-2)',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 8,
+                      background: 'var(--ub-surface-2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flex: 'none',
+                      fontSize: 13,
+                    }}
+                  >
+                    {ACTIVITY_ICON[a.type] ?? '•'}
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)' }}>{a.detail}</div>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 16 }}>{myRow?.tasks ?? 0}</div>
-                    <div style={{ color: 'var(--ub-ink-faint)' }}>Tasks Completed</div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 16 }}>{myRow?.wins ?? 0}</div>
-                    <div style={{ color: 'var(--ub-ink-faint)' }}>Achievements</div>
-                  </div>
-                  {next !== null && (
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}>{next}</div>
-                      <div style={{ color: 'var(--ub-ink-faint)' }}>Points to next level</div>
-                    </div>
-                  )}
+                  <strong style={{ fontSize: 12.5, color: 'var(--ub-accent-dark)', flex: 'none' }}>+{a.points}</strong>
                 </div>
-                <Link href="/leaderboard" className="ub-btn ub-btn-ghost" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}>
-                  View Full Leaderboard
-                </Link>
-              </>
-            )}
+              ))}
           </div>
 
           {assignments.length > 0 && (

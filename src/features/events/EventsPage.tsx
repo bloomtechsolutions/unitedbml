@@ -122,7 +122,6 @@ export function EventsPage() {
       <div className="page-head">
         <div>
           <h2>Events & Activities</h2>
-          <p>Plan, track, and close out UnitedBML events end-to-end.</p>
         </div>
         <div className="actions">
           <button
@@ -137,26 +136,26 @@ export function EventsPage() {
         </div>
       </div>
 
-      <div className="kpis">
-        <div className="kpi">
-          <div className="lbl">Total Events</div>
-          <strong>{kpis.total}</strong>
+      <div className="ub-kpi-strip">
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.total}</span>
+          <span className="ub-kpi-strip-label">Total Events</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Upcoming</div>
-          <strong>{kpis.upcoming}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.upcoming}</span>
+          <span className="ub-kpi-strip-label">Upcoming</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Planning</div>
-          <strong>{kpis.planning}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.planning}</span>
+          <span className="ub-kpi-strip-label">Planning</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Completed</div>
-          <strong>{kpis.completed}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.completed}</span>
+          <span className="ub-kpi-strip-label">Completed</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Total Budget</div>
-          <strong>{kpis.budget.toLocaleString()}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.budget.toLocaleString()}</span>
+          <span className="ub-kpi-strip-label">Total Budget</span>
         </div>
       </div>
 
