@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import { useMyCommitteeId } from '../portal/usePortal';
 import type { ApBillRow, VendorMasterRow } from '../../types/database';
 import { ATTACHMENT_MODES } from './types';
 import type { ApBatchWithBills, AttachmentMode, ProcurementGroupCase } from './types';
@@ -86,7 +87,8 @@ interface Props {
 }
 
 export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSaved }: Props) {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
+  const myCommitteeId = useMyCommitteeId(session?.user.id);
   const [bills, setBills] = useState<DraftBill[]>([emptyBill()]);
   const [apEmail, setApEmail] = useState('');
   const [attachmentMode, setAttachmentMode] = useState<AttachmentMode>('Combined');
@@ -94,6 +96,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
   const [saving, setSaving] = useState(false);
   const [sendProgress, setSendProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [eventManagerCommitteeId, setEventManagerCommitteeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (existingBatch) {
@@ -111,10 +114,28 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
     setError(null);
   }, [existingBatch, caseItem]);
 
+  useEffect(() => {
+    if (!caseItem?.event_id) {
+      setEventManagerCommitteeId(null);
+      return;
+    }
+    supabase
+      .from('events')
+      .select('reimbursement_manager_committee_id')
+      .eq('id', caseItem.event_id)
+      .maybeSingle()
+      .then(({ data }) => setEventManagerCommitteeId(data?.reimbursement_manager_committee_id ?? null));
+  }, [caseItem?.event_id]);
+
   if (!caseItem) return null;
 
   const remaining = caseItem.approved_item_amount - apSubmittedTotal(batches, caseItem.id);
   const billsTotal = bills.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+  // A batch already reviewed (or not built by the assigned Manager) can be sent normally; a
+  // fresh submission from the assigned Manager must go through committee review first.
+  const isManagerSubmission = !!eventManagerCommitteeId && !!myCommitteeId && myCommitteeId === eventManagerCommitteeId;
+  const needsReview = existingBatch ? existingBatch.pending_review : isManagerSubmission;
 
   const updateBill = (key: string, patch: Partial<DraftBill>) => {
     setBills((prev) => prev.map((b) => (b._key === key ? { ...b, ...patch } : b)));
@@ -125,6 +146,10 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
       setError(`Total bills (${billsTotal.toLocaleString()}) exceed the remaining approved balance (${remaining.toLocaleString()}).`);
       return;
     }
+    if (send && needsReview) {
+      setError('This submission needs committee review before it can be sent to Accounts Payable.');
+      return;
+    }
     setSaving(true);
     setError(null);
     setSendProgress(send ? 'Saving bills…' : null);
@@ -133,7 +158,10 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         existingBatch?.id ?? null,
         caseItem.id,
         bills.map(({ _key: _k, _file: _f, ...b }) => b),
-        apEmail
+        apEmail,
+        !existingBatch && isManagerSubmission
+          ? { managerCommitteeId: myCommitteeId!, managerName: profile?.full_name || profile?.email || 'Unknown' }
+          : undefined
       );
 
       if (attachmentMode === 'Combined' && combinedFile) {
@@ -259,6 +287,14 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         )}
       </div>
 
+      {needsReview && (
+        <div className="ub-banner ub-banner-accent" style={{ marginTop: 16 }}>
+          {existingBatch?.reviewed_at
+            ? 'Reviewed — this batch can now be sent to Accounts Payable.'
+            : "As the assigned Reimbursement Manager, this batch is saved for committee review before it can be sent to Accounts Payable — you won't be able to send it yourself."}
+        </div>
+      )}
+
       {sendProgress && (
         <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--ub-accent-dark, #1d4ed8)' }}>{sendProgress}</div>
       )}
@@ -268,11 +304,13 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
           Cancel
         </button>
         <button className="btn soft" onClick={() => void handleSaveDraft(false)} disabled={saving}>
-          Save Draft
+          {needsReview && !existingBatch ? 'Submit for Committee Review' : 'Save Draft'}
         </button>
-        <button className="btn primary" onClick={() => void handleSaveDraft(true)} disabled={saving}>
-          {saving ? 'Sending…' : 'Send AP Email + Attachments'}
-        </button>
+        {!needsReview && (
+          <button className="btn primary" onClick={() => void handleSaveDraft(true)} disabled={saving}>
+            {saving ? 'Sending…' : 'Send AP Email + Attachments'}
+          </button>
+        )}
       </div>
     </Modal>
   );

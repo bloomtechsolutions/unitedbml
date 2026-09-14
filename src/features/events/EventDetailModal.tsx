@@ -23,6 +23,7 @@ import { buildEventTimeline } from './timeline';
 import type { CommitteeMemberOption, EventWithChildren, StaffOption } from './types';
 import { TaskFormModal } from './TaskFormModal';
 import { AssignOfficialModal } from './AssignOfficialModal';
+import { AssignReimbursementManagerModal } from './AssignReimbursementManagerModal';
 import { BulkAttendanceModal } from './BulkAttendanceModal';
 import { EventWinnersPanel } from './EventWinnersPanel';
 import { syncTournamentAttendance, useLinkedTournament } from '../tournaments/useTournaments';
@@ -77,6 +78,7 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
   const [syncing, setSyncing] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [assignOfficialOpen, setAssignOfficialOpen] = useState(false);
+  const [assignManagerOpen, setAssignManagerOpen] = useState(false);
   const { statusByEvent: financeByEvent } = useEventFinanceSummary();
   const { requests: allRequests, reload: reloadRequests } = useExpenseRequests();
   const [viewingRequest, setViewingRequest] = useState<ExpenseRequestWithLines | null>(null);
@@ -376,6 +378,27 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
                 No pending tasks. All assigned activity responsibilities are completed.
               </div>
             )}
+          </div>
+
+          <div className="ub-card" style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 700 }}>Reimbursement Manager</h3>
+                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginTop: 4 }}>
+                  For events run outside UnitedBML (e.g. staff at an external tournament) — the assigned manager can
+                  submit AP bills for this event's approved expenses, but another committee member must review before
+                  it's sent to Accounts Payable.
+                </p>
+              </div>
+              {isCommitteeUser && (
+                <button className="ub-btn ub-btn-ghost" style={{ padding: '7px 14px', fontSize: 12.5, flex: 'none' }} onClick={() => setAssignManagerOpen(true)}>
+                  {event.reimbursement_manager ? 'Change' : 'Assign'}
+                </button>
+              )}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 13.5, fontWeight: 700 }}>
+              {event.reimbursement_manager ? `${event.reimbursement_manager} · ${event.reimbursement_manager_role}` : 'Unassigned'}
+            </div>
           </div>
         </div>
       )}
@@ -737,6 +760,14 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
         onAdded={onRefresh}
       />
       <AssignOfficialModal open={assignOfficialOpen} eventId={event.id} onClose={() => setAssignOfficialOpen(false)} />
+      <AssignReimbursementManagerModal
+        open={assignManagerOpen}
+        eventId={event.id}
+        currentCommitteeId={event.reimbursement_manager_committee_id}
+        members={coordinators}
+        onClose={() => setAssignManagerOpen(false)}
+        onSaved={onRefresh}
+      />
     </Modal>
   );
 }

@@ -16,6 +16,7 @@ import type { ApBatchWithBills, EligibleExpenseLine, EligibleExpenseRequest, Pro
 import {
   apSubmittedTotal,
   deleteVendor,
+  reviewApBatch,
   sendProcurementGroupEmail,
   useEligibleExpenseRequests,
   useReimbursementCases,
@@ -41,6 +42,7 @@ export function ReimbursementsPage() {
   const [subTab, setSubTab] = useState<SubTab>('cases');
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [groupTarget, setGroupTarget] = useState<EligibleExpenseRequest | null>(null);
   const [exceptionTarget, setExceptionTarget] = useState<EligibleExpenseLine | null>(null);
   const [respondingGroup, setRespondingGroup] = useState<ProcurementGroupCase | null>(null);
@@ -84,6 +86,19 @@ export function ReimbursementsPage() {
       toast(err instanceof Error ? err.message : 'Failed to send email.');
     } finally {
       setResendingId(null);
+    }
+  };
+
+  const handleReview = async (batchId: string) => {
+    setReviewingId(batchId);
+    try {
+      await reviewApBatch(batchId, profile?.full_name || profile?.email || 'Unknown');
+      toast('Batch approved — it can now be sent to Accounts Payable.');
+      await refresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to approve batch.');
+    } finally {
+      setReviewingId(null);
     }
   };
 
@@ -329,6 +344,13 @@ export function ReimbursementsPage() {
                   <td>{b.bills.reduce((sum, bill) => sum + bill.amount, 0).toLocaleString()}</td>
                   <td>
                     <span className={`ap-status ${b.status.replace(/[\s/]/g, '')}`}>{b.status}</span>
+                    {b.pending_review && (
+                      <div style={{ marginTop: 4 }}>
+                        <span className="pill" style={{ background: '#fff4db', color: '#946100' }}>
+                          Pending Review{b.manager_submitted_by ? ` · ${b.manager_submitted_by}` : ''}
+                        </span>
+                      </div>
+                    )}
                     {b.status_remarks && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{b.status_remarks}</div>}
                   </td>
                   <td style={{ display: 'flex', gap: 6 }}>
@@ -341,6 +363,11 @@ export function ReimbursementsPage() {
                         }}
                       >
                         Edit
+                      </button>
+                    )}
+                    {b.pending_review && (
+                      <button className="btn primary" disabled={reviewingId === b.id} onClick={() => void handleReview(b.id)}>
+                        {reviewingId === b.id ? 'Approving…' : 'Approve for AP'}
                       </button>
                     )}
                     <button className="btn ghost" onClick={() => setStatusBatch(b)}>

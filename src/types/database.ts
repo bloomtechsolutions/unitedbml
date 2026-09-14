@@ -75,6 +75,9 @@ export interface EventRow {
   coordinator: string | null;
   coordinator_role: string | null;
   coordinator_committee_id: string | null;
+  reimbursement_manager: string | null;
+  reimbursement_manager_role: string | null;
+  reimbursement_manager_committee_id: string | null;
   expected_participants: number;
   attendance_count: number;
   planned_budget: number;
@@ -503,6 +506,13 @@ export interface ApBatchRow {
   sent_at: string | null;
   status_date: string | null;
   status_remarks: string | null;
+  submitted_by_manager: boolean;
+  manager_committee_id: string | null;
+  manager_submitted_by: string | null;
+  manager_submitted_at: string | null;
+  pending_review: boolean;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
   data: Record<string, unknown>;
   created_at: string;
   updated_at: string;

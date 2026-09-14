@@ -308,11 +308,17 @@ export function apPaidTotal(batches: ApBatchWithBills[], caseId: string): number
     .reduce((sum, b) => sum + b.bills.reduce((s, bill) => s + bill.amount, 0), 0);
 }
 
+export interface ManagerSubmission {
+  managerCommitteeId: string;
+  managerName: string;
+}
+
 export async function saveApBatchDraft(
   batchId: string | null,
   caseId: string,
   bills: Omit<ApBillRow, 'id' | 'ap_batch_id'>[],
-  apEmail: string
+  apEmail: string,
+  managerSubmission?: ManagerSubmission
 ) {
   const id = batchId ?? crypto.randomUUID();
   if (!batchId) {
@@ -323,6 +329,15 @@ export async function saveApBatchDraft(
       submission_date: new Date().toISOString().slice(0, 10),
       status: 'Draft',
       ap_email: apEmail || null,
+      ...(managerSubmission
+        ? {
+            submitted_by_manager: true,
+            pending_review: true,
+            manager_committee_id: managerSubmission.managerCommitteeId,
+            manager_submitted_by: managerSubmission.managerName,
+            manager_submitted_at: new Date().toISOString(),
+          }
+        : {}),
     } satisfies Partial<ApBatchRow>);
     if (error) throw error;
   } else {
@@ -480,6 +495,11 @@ export async function sendApBatch(batch: ApBatchWithBills, caseItem: Procurement
       .eq('id', batch.id);
     throw err;
   }
+}
+
+export async function reviewApBatch(batchId: string, reviewerName: string) {
+  const { error } = await supabase.rpc('review_ap_batch', { p_batch_id: batchId, p_reviewer_name: reviewerName });
+  if (error) throw error;
 }
 
 export async function updateApBatchStatus(batch: ApBatchWithBills, status: string, remarks: string, actorName: string) {
