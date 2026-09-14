@@ -222,17 +222,17 @@ export function ReportsPage() {
         ) : (
           <>
             {kpis.length > 0 && (
-              <div className="kpis">
+              <div className="ub-kpi-strip">
                 {kpis.map((k) => (
-                  <div className="kpi" key={k.label}>
-                    <div className="lbl">{k.label}</div>
-                    <strong>
+                  <div className="ub-kpi-strip-item" key={k.label}>
+                    <span className="ub-kpi-strip-value">
                       {k.isMoney
                         ? k.value.toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                           })
                         : k.value}
-                    </strong>
+                    </span>
+                    <span className="ub-kpi-strip-label">{k.label}</span>
                   </div>
                 ))}
               </div>
