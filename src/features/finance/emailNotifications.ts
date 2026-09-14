@@ -2,6 +2,8 @@ import { outlookEmailTemplate, sendEmail, type EmailAttachment } from '../../lib
 import { generateApprovedExpenseNotePdf } from '../../lib/expenseNotePdf';
 import { supabase } from '../../lib/supabase';
 
+const APP_URL = 'https://unitedbml-gamma.vercel.app';
+
 interface ExpenseRequestEmailContext {
   id: string;
   request_number: string | null;
@@ -10,6 +12,12 @@ interface ExpenseRequestEmailContext {
   requested_by: string | null;
   requester_role: string | null;
   total_amount: number | null;
+}
+
+interface ExpenseLineForEmail {
+  description: string;
+  quantity: number;
+  rate: number;
 }
 
 async function requesterEmail(requestedByUser: string | null): Promise<string | null> {
@@ -25,10 +33,14 @@ export async function notifyExpenseApprover(
   request: ExpenseRequestEmailContext,
   approverEmail: string,
   approverName: string,
-  stage: 'President Recommendation' | 'Final Approval'
+  stage: 'President Recommendation' | 'Final Approval',
+  lines: ExpenseLineForEmail[] = []
 ) {
   if (!approverEmail) return;
   const subject = `Expense Approval Needed — ${request.title || request.request_number} (${stage})`;
+  const validLines = lines.filter((l) => l.description?.trim());
+  const subtotal = validLines.reduce((sum, l) => sum + (l.quantity || 0) * (l.rate || 0), 0);
+  const contingency = Math.round(subtotal * 0.05 * 100) / 100;
   const html = outlookEmailTemplate({
     heading: stage === 'President Recommendation' ? 'President Recommendation Required' : 'Final Approval Required',
     intro: `Dear ${approverName || 'Sir/Madam'}, an expense request is waiting on your decision.`,
@@ -37,8 +49,23 @@ export async function notifyExpenseApprover(
       { label: 'Event / Activity', value: request.event_name || 'General Club Expense' },
       { label: 'Requested By', value: `${request.requested_by ?? ''} (${request.requester_role ?? ''})` },
     ],
+    itemsTable: validLines.length
+      ? {
+          headers: ['Item', 'Qty', 'Rate (MVR)', 'Amount (MVR)'],
+          rows: [
+            ...validLines.map((l) => [
+              l.description,
+              String(l.quantity || 0),
+              Number(l.rate || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+              Number((l.quantity || 0) * (l.rate || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+            ]),
+            ['Contingency (5%)', '', '', contingency.toLocaleString(undefined, { minimumFractionDigits: 2 })],
+          ],
+        }
+      : undefined,
     totalLabel: 'Total Amount',
-    totalValue: `MVR ${Number(request.total_amount ?? 0).toLocaleString()}`,
+    totalValue: `MVR ${Number(request.total_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+    ctaButton: { label: 'Proceed to Approval', href: `${APP_URL}/finance?open=${request.id}` },
     signatureName: request.requested_by || 'UnitedBML Finance',
     signatureRole: request.requester_role || '',
     signatureEmail: '',

@@ -48,7 +48,13 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
     await presidentDecision(request, decision, comment, profile?.full_name || '', profile?.role || '');
     try {
       if (decision === 'recommend') {
-        await notifyExpenseApprover(request, request.final_approver_email || '', request.final_approver_name || '', 'Final Approval');
+        await notifyExpenseApprover(
+          request,
+          request.final_approver_email || '',
+          request.final_approver_name || '',
+          'Final Approval',
+          request.lines
+        );
       } else {
         await notifyExpenseDecision(request, 'Rejected', comment, profile?.full_name || '', profile?.role || '');
       }

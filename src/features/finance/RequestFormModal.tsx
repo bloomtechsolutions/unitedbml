@@ -221,9 +221,9 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
           total_amount: total,
         };
         if (created.status === 'Pending President Recommendation' && president?.email) {
-          await notifyExpenseApprover(emailContext, president.email, president.name, 'President Recommendation');
+          await notifyExpenseApprover(emailContext, president.email, president.name, 'President Recommendation', validLines);
         } else if (created.status === 'Pending Final Approval' && approver.email) {
-          await notifyExpenseApprover(emailContext, approver.email, approver.name ?? '', 'Final Approval');
+          await notifyExpenseApprover(emailContext, approver.email, approver.name ?? '', 'Final Approval', validLines);
         }
       } catch (notifyErr) {
         toast(notifyErr instanceof Error ? `Request submitted, but the approver email failed to send: ${notifyErr.message}` : 'Request submitted, but the approver email failed to send.');

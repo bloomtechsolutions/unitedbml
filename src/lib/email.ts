@@ -148,11 +148,12 @@ export function outlookEmailTemplate(opts: {
   totalValue?: string;
   advisory?: string;
   boxedNote?: { label: string; value: string };
+  ctaButton?: { label: string; href: string };
   signatureName: string;
   signatureRole: string;
   signatureEmail: string;
 }): string {
-  const { heading, intro, rows, itemsTable, totalLabel, totalValue, advisory, boxedNote, signatureName, signatureRole, signatureEmail } = opts;
+  const { heading, intro, rows, itemsTable, totalLabel, totalValue, advisory, boxedNote, ctaButton, signatureName, signatureRole, signatureEmail } = opts;
   const rowsHtml = rows
     .map(
       (r) =>
@@ -192,6 +193,20 @@ export function outlookEmailTemplate(opts: {
       </table>`
     : '';
 
+  const ctaButtonHtml = ctaButton
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 20px;">
+        <tr><td align="center">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="border-radius:6px;background:#2563eb;">
+              <a href="${ctaButton.href}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px;">
+                ${ctaButton.label} &rarr;
+              </a>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>`
+    : '';
+
   return `<!--[if mso]>
 <table role="presentation" width="680" cellpadding="0" cellspacing="0" align="center"><tr><td>
 <![endif]-->
@@ -207,6 +222,7 @@ export function outlookEmailTemplate(opts: {
     ${totalHtml}
     ${boxedNoteHtml}
     ${advisoryHtml}
+    ${ctaButtonHtml}
     <p style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#374151;margin:16px 0 0;">Regards,<br/>
       <b>${signatureName}</b>${signatureRole ? `, ${signatureRole}` : ''}${signatureEmail ? `<br/>${signatureEmail}` : ''}
     </p>
