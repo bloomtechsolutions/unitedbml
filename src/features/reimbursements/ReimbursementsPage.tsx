@@ -326,7 +326,7 @@ export function ReimbursementsPage() {
               .map((b) => (
                 <tr key={b.id}>
                   <td>{b.submission_ref}</td>
-                  <td>{lineCases.find((c) => c.id === b.reimbursement_id)?.case_ref || b.reimbursement_id}</td>
+                  <td>{cases.find((c) => c.id === b.reimbursement_id)?.case_ref || b.reimbursement_id}</td>
                   <td>{b.bills.length}</td>
                   <td>{b.bills.reduce((sum, bill) => sum + bill.amount, 0).toLocaleString()}</td>
                   <td>
@@ -352,7 +352,12 @@ export function ReimbursementsPage() {
                       <button
                         className="btn ghost"
                         onClick={() => {
-                          setBatchCase(lineCases.find((c) => c.id === b.reimbursement_id) ?? null);
+                          const c = cases.find((c) => c.id === b.reimbursement_id);
+                          if (!c) {
+                            toast(`Case ${b.reimbursement_id} for this batch no longer exists — cannot edit.`);
+                            return;
+                          }
+                          setBatchCase(c);
                           setEditingBatch(b);
                         }}
                       >
@@ -360,7 +365,16 @@ export function ReimbursementsPage() {
                       </button>
                     )}
                     {b.pending_review && (
-                      <button className="btn primary" onClick={() => setReviewBatch(b)}>
+                      <button
+                        className="btn primary"
+                        onClick={() => {
+                          if (!cases.some((c) => c.id === b.reimbursement_id)) {
+                            toast(`Case ${b.reimbursement_id} for this batch no longer exists — cannot review.`);
+                            return;
+                          }
+                          setReviewBatch(b);
+                        }}
+                      >
                         Review
                       </button>
                     )}
@@ -582,7 +596,7 @@ export function ReimbursementsPage() {
       />
       <ReviewApBatchModal
         batch={reviewBatch}
-        caseItem={reviewBatch ? lineCases.find((c) => c.id === reviewBatch.reimbursement_id) ?? null : null}
+        caseItem={reviewBatch ? cases.find((c) => c.id === reviewBatch.reimbursement_id) ?? null : null}
         onClose={() => setReviewBatch(null)}
         onDecided={refresh}
       />
