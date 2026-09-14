@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import type { VendorMasterRow } from '../../types/database';
@@ -22,7 +23,38 @@ import {
   useVendorMaster,
 } from './useReimbursements';
 
-type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'vendors';
+type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'vendors' | 'info';
+
+const REIMBURSEMENTS_INFO = [
+  {
+    q: 'What are "Eligible Approved Expense Items"?',
+    a: "Expense lines already approved in Finance and flagged for reimbursement, but not yet routed into a reimbursement case. From here you either send them for Standard Procurement pre-approval, or record them directly as a No Pre-Approval / Exception case if they were already paid or don't need pre-approval. Nothing here is awaiting approval — approval already happened in Finance; this is only about routing.",
+  },
+  {
+    q: 'What is a Reimbursement Case?',
+    a: 'A case tracks one approved expense item through to payment: its approved amount, how much has been submitted so far, and what remains. A case must be Pre-Approved (via Procurement) or have an Exception recorded before it can be submitted into an AP Batch.',
+  },
+  {
+    q: 'What happens in the Procurement tab?',
+    a: 'Cases sent for Standard Pre-Approval wait here for a Procurement decision. An email is sent to the Procurement contact automatically; once their response is recorded, the case moves to Pre-Approved and becomes eligible for an AP Batch.',
+  },
+  {
+    q: 'How does an AP Submission get reviewed and sent?',
+    a: 'A Reimbursement Manager (or committee member) drafts a batch of bills against a case. A committee member opens it from AP Submissions, reviews each bill and its attached receipt inline (no download needed), then either Approves & Sends to Accounts Payable by email, or Returns it to the submitter with a required reason. A batch can be resubmitted any number of times, but the running total across all submissions for a case can never exceed its approved amount.',
+  },
+  {
+    q: 'What gets emailed to Accounts Payable?',
+    a: 'Every approved AP email includes the submitted bills and a signed-off approval note — either the Finance Expense Approval Note (for cases routed through a Finance request) or an AP Submission Approval Note built from the batch\'s own review trail (for cases without one, e.g. externally-run events).',
+  },
+  {
+    q: 'What is an Exception?',
+    a: "For an expense item that was already paid, or genuinely doesn't need Procurement pre-approval. Recording one moves the case straight to Exception Recorded, skipping the Procurement tab.",
+  },
+  {
+    q: 'What are Vendors?',
+    a: 'The payee directory bills are raised against — account details and status. Only Treasurer, President, Chairperson, Vice Chairperson or Secretary can add or edit vendor records.',
+  },
+];
 
 const VENDOR_MANAGER_ROLES = ['treasurer', 'president', 'chairperson', 'vice chairperson', 'vice_chairperson', 'secretary'];
 
@@ -140,16 +172,16 @@ export function ReimbursementsPage() {
         <button className={`tab ${subTab === 'vendors' ? 'active' : ''}`} onClick={() => setSubTab('vendors')}>
           Vendors ({vendors.length})
         </button>
+        <button className={`tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
+          Info
+        </button>
       </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={REIMBURSEMENTS_INFO} />}
 
       {subTab === 'cases' && (
         <div>
           <h4>Eligible Approved Expense Items</h4>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
-            These expense items are already Finance-approved and just need routing before bills can be submitted for
-            them — send a request for Standard Procurement pre-approval, or record an item as a No Pre-Approval /
-            Exception case if it was already paid or doesn't need one. Amounts appear once a case is opened below.
-          </p>
           {eligible.length > 0 && (
             <div style={{ overflowX: 'auto', marginBottom: 20 }}>
               <table className="table" style={{ fontSize: 12.5 }}>
@@ -188,9 +220,6 @@ export function ReimbursementsPage() {
           {!eligible.length && <p style={{ color: 'var(--muted)' }}>No approved expense items awaiting reimbursement processing.</p>}
 
           <h4 style={{ marginTop: 20 }}>Reimbursement Cases</h4>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
-            Once a case is Pre-Approved or has an Exception recorded, submit it into an AP Batch for payment.
-          </p>
           <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>

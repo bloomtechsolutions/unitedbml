@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import type { DocumentRegistryRow } from '../../types/database';
@@ -14,7 +15,26 @@ import {
   useLinkedEvidence,
 } from './useDocuments';
 
-type SubTab = 'library' | 'folders' | 'notes' | 'evidence';
+type SubTab = 'library' | 'folders' | 'notes' | 'evidence' | 'info';
+
+const DOCUMENTS_INFO = [
+  {
+    q: 'What is the Library?',
+    a: 'Every uploaded file, searchable by title, filename or event, with category and who uploaded it.',
+  },
+  {
+    q: 'What are Event Folders?',
+    a: 'The Library grouped by event, so you can see everything filed against one activity in one place.',
+  },
+  {
+    q: 'What are Approved Notes?',
+    a: 'A one-click PDF export for any approved Expense Request — generated fresh on demand from the current approval record, not stored, so it always reflects the latest data.',
+  },
+  {
+    q: 'What is Procurement & AP Evidence?',
+    a: "A read-only view of files already living in the Reimbursements module (Procurement responses, AP bill attachments) surfaced here for convenience. They aren't copied — delete or replace them from Reimbursements if needed.",
+  },
+];
 
 interface FolderItem {
   key: string;
@@ -187,7 +207,12 @@ export function DocumentsPage() {
         <button className={`tab ${subTab === 'evidence' ? 'active' : ''}`} onClick={() => setSubTab('evidence')}>
           Procurement & AP Evidence
         </button>
+        <button className={`tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
+          Info
+        </button>
       </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={DOCUMENTS_INFO} />}
 
       {subTab === 'library' && (
         <>
@@ -282,10 +307,6 @@ export function DocumentsPage() {
 
       {subTab === 'notes' && (
         <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Generated on demand from each approved Expense Request — not stored, always reflects the current
-            approval record.
-          </p>
           {notesLoading ? (
             <div>Loading…</div>
           ) : (
@@ -330,10 +351,6 @@ export function DocumentsPage() {
 
       {subTab === 'evidence' && (
         <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)' }}>
-            Read-only — these files live in the Reimbursements module's storage and are surfaced here for
-            convenience, not copied. Delete them from Reimbursements if needed.
-          </p>
           {evidenceLoading ? (
             <div>Loading…</div>
           ) : (

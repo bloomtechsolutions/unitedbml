@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { ClassificationModal } from './ClassificationModal';
@@ -10,8 +11,24 @@ import { deleteClassification, useStaffAudience, useStaffRoster } from './useSta
 type MatchFilter = '' | 'UNIT' | 'DEPARTMENT';
 type CategoryFilter = '' | 'MALE_BASED' | 'ATOLL_BASED' | 'UNCLASSIFIED';
 
+const CLASSIFICATION_INFO = [
+  {
+    q: 'What does this page do?',
+    a: 'Maps each staff Unit or Department to an audience category — Male Based or Atoll Based — so events and communications can be targeted to the right audience instead of broadcast to everyone.',
+  },
+  {
+    q: 'Unit vs Department — which should I classify?',
+    a: 'Classify by Unit whenever possible — it\'s the more specific grouping. Department classification is a fallback, used only when a staff member\'s Unit itself has no classification.',
+  },
+  {
+    q: 'What happens if something is Unclassified?',
+    a: "Staff under an unclassified Unit or Department won't be matched into either audience category until you classify it — Classify sets the category, Edit changes it, Remove clears it back to Unclassified.",
+  },
+];
+
 export function StaffAudiencePage() {
   const { isAdministrator } = useAuth();
+  const [subTab, setSubTab] = useState<'classification' | 'info'>('classification');
   const { staff, loading: staffLoading } = useStaffRoster();
   const { rows, loading, reload } = useStaffAudience(staff);
   const toast = useToast();
@@ -56,10 +73,22 @@ export function StaffAudiencePage() {
       <div className="page-head">
         <div>
           <h2>Location Classification</h2>
-          <p>Map units and departments to an audience category (Male Based / Atoll Based) for event eligibility.</p>
         </div>
       </div>
 
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        <button className={`tab ${subTab === 'classification' ? 'active' : ''}`} onClick={() => setSubTab('classification')}>
+          Classification
+        </button>
+        <button className={`tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
+          Info
+        </button>
+      </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={CLASSIFICATION_INFO} />}
+
+      {subTab === 'classification' && (
+      <>
       <div className="kpis">
         <div className="kpi">
           <div className="lbl">Male Based</div>
@@ -141,6 +170,8 @@ export function StaffAudiencePage() {
           )}
         </tbody>
       </table>
+      </>
+      )}
 
       <ClassificationModal row={editing} onClose={() => setEditing(null)} onSaved={reload} />
     </div>

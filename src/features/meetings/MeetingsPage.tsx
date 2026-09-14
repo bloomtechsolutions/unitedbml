@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { useCommitteeMembers } from '../events/useEvents';
@@ -23,7 +24,22 @@ import {
   useMeetings,
 } from './useMeetings';
 
-type SubTab = 'meetings' | 'actions' | 'decisions';
+type SubTab = 'meetings' | 'actions' | 'decisions' | 'info';
+
+const MEETINGS_INFO = [
+  {
+    q: 'What happens in Meetings?',
+    a: "Schedule a meeting, set its agenda, and open a check-in window so attendance is logged as members join — that attendance feeds Meeting Attendance Detail in Reports.",
+  },
+  {
+    q: 'What is Action Follow-up?',
+    a: 'Tasks assigned out of a meeting, tracked open → overdue → done. Open ones surface on the Dashboard\'s priority work until they\'re closed.',
+  },
+  {
+    q: 'What is the Decision Register?',
+    a: 'The formal record of what was decided in each meeting, kept for reference and audit.',
+  },
+];
 
 const STATUS_PILL: Record<MeetingStatus, string> = {
   Scheduled: 'ub-pill-warning',
@@ -187,7 +203,12 @@ export function MeetingsPage() {
         <button className={`ub-tab ${subTab === 'decisions' ? 'active' : ''}`} onClick={() => setSubTab('decisions')}>
           Decision Register
         </button>
+        <button className={`ub-tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
+          Info
+        </button>
       </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={MEETINGS_INFO} />}
 
       {subTab === 'meetings' && (
         <>

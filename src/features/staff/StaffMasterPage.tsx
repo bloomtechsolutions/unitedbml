@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useCommitteeMembers } from '../committee/useCommittee';
 import { isVacant } from '../committee/availability';
@@ -9,8 +10,28 @@ import { StaffImportModal } from './StaffImportModal';
 import type { StaffRow } from '../../types/database';
 import { useStaffRoster } from './useStaff';
 
+const STAFF_MASTER_INFO = [
+  {
+    q: 'What is Staff Master?',
+    a: 'The source of truth for staff org data — Committee, Events, and Tournaments all resolve into this. Every staff record here is what those modules search and reference.',
+  },
+  {
+    q: 'How do I add staff in bulk?',
+    a: 'Use Bulk Import to upload a CSV and onboard or refresh many records at once, instead of adding them one by one.',
+  },
+  {
+    q: 'Why does Department/Unit matter?',
+    a: 'Setting a staff member\'s Department and Unit feeds directly into Location Classification, which groups staff into audiences so events and communications can be targeted rather than broadcast to everyone.',
+  },
+  {
+    q: 'What does the UnitedBML column show?',
+    a: 'Whether the staff member currently holds a committee position — if so, their role is shown; otherwise they\'re a plain Staff Member.',
+  },
+];
+
 export function StaffMasterPage() {
   const { isAdministrator } = useAuth();
+  const [subTab, setSubTab] = useState<'roster' | 'info'>('roster');
   const { staff, loading, error, reload } = useStaffRoster();
   const { members: committeeMembers } = useCommitteeMembers();
 
@@ -57,7 +78,6 @@ export function StaffMasterPage() {
       <div className="page-head">
         <div>
           <h2>Staff Master</h2>
-          <p>The source of truth for staff org data — Committee, Events, and Tournaments all resolve into this.</p>
         </div>
         <div className="actions" style={{ display: 'flex', gap: 8 }}>
           <button className="btn ghost" onClick={() => setImportOpen(true)}>
@@ -69,6 +89,19 @@ export function StaffMasterPage() {
         </div>
       </div>
 
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        <button className={`tab ${subTab === 'roster' ? 'active' : ''}`} onClick={() => setSubTab('roster')}>
+          Roster
+        </button>
+        <button className={`tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
+          Info
+        </button>
+      </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={STAFF_MASTER_INFO} />}
+
+      {subTab === 'roster' && (
+      <>
       <div className="kpis">
         <div className="kpi">
           <div className="lbl">Total Staff</div>
@@ -163,6 +196,8 @@ export function StaffMasterPage() {
           )}
         </tbody>
       </table>
+      </>
+      )}
 
       <StaffEditModal open={editing !== undefined} onClose={() => setEditing(undefined)} editing={editing ?? null} onSaved={reload} />
       <StaffImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={reload} />

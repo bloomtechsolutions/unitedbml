@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { applyReportFilters } from './filters';
@@ -19,8 +20,28 @@ function formatValue(value: unknown, type: string): string {
   return String(value);
 }
 
+const REPORTS_INFO = [
+  {
+    q: 'How do I find a specific report?',
+    a: 'Pick a Category from the first dropdown, then the report itself from the second — each category groups reports by area (Finance & Budget, Reimbursements & AP, Events & Attendance, Governance & Committee, Meetings & Engagement, Communication & Audit, Executive Reports).',
+  },
+  {
+    q: 'What do the filters do?',
+    a: 'Date range, event, status and free-text search all apply on top of whatever report is currently loaded — they narrow the rows shown and the KPI totals above the table, without changing which report you picked.',
+  },
+  {
+    q: 'Can I export or print a report?',
+    a: 'Yes — Export CSV downloads exactly the filtered rows currently on screen; Print / Save PDF opens a print-ready version of the same data.',
+  },
+  {
+    q: 'Why is a KPI strip only sometimes shown?',
+    a: "KPIs summarize a report's numeric columns (money or count) — a report with no numeric columns (like a directory) shows just the table.",
+  },
+];
+
 export function ReportsPage() {
   const { isCommitteeUser } = useAuth();
+  const [view, setView] = useState<'reports' | 'info'>('reports');
   const [selectedId, setSelectedId] = useState('expense-register');
   const selectedCategory =
     REPORT_DEFINITIONS.find((r) => r.id === selectedId)?.category ??
@@ -96,6 +117,19 @@ export function ReportsPage() {
         </div>
       </div>
 
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        <button className={`tab ${view === 'reports' ? 'active' : ''}`} onClick={() => setView('reports')}>
+          Reports
+        </button>
+        <button className={`tab ${view === 'info' ? 'active' : ''}`} onClick={() => setView('info')}>
+          Info
+        </button>
+      </div>
+
+      {view === 'info' && <PageInfoPanel sections={REPORTS_INFO} />}
+
+      {view === 'reports' && (
+      <>
       <div className="toolbar" style={{ marginBottom: 14 }}>
         <div className="filters">
           <select
@@ -288,6 +322,8 @@ export function ReportsPage() {
           </>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

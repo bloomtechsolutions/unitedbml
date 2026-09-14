@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import type { StandingAllocationRow } from '../../types/database';
@@ -8,12 +9,32 @@ import { AllocationEntriesModal } from './AllocationEntriesModal';
 import { AllocationFormModal } from './AllocationFormModal';
 import { actualTotal, setAllocationActive, useAllocationEntries, useStandingAllocations } from './useAllocations';
 
+const ALLOCATIONS_INFO = [
+  {
+    q: 'What is a Standing Allocation?',
+    a: "An activity that's pre-approved but never touches the Events workflow — run outside UnitedBML, yet still deducted from the UBML account. Fun with Team, UBML Allowance, Women's Day, Men's Day and Year End Activities are set up out of the box; add more from + New Activity.",
+  },
+  {
+    q: "What's the difference between Monthly and Annual?",
+    a: 'Monthly is an ongoing allowance with no fixed pool (Fun with Team, UBML Allowance) — only its running actual total is tracked. Annual is a fund held at the start of the year that actuals draw down against, with a live Remaining figure (Women\'s/Men\'s Day, Year End Activities).',
+  },
+  {
+    q: "How do I log Finance's numbers?",
+    a: "Open Monthly Actuals on any activity, pick the month, key in the amount from Finance's monthly sheet, and optionally a source reference. Every activity's actual total rolls straight into the Finance dashboard's Available Balance and Actual Expense — no separate reconciliation step.",
+  },
+  {
+    q: 'Can I deactivate an activity without losing its history?',
+    a: "Yes — Deactivate hides it from new logging while keeping every past entry intact. Reactivate brings it back.",
+  },
+];
+
 export function AllocationsPage() {
   const { isCommitteeUser } = useAuth();
   const toast = useToast();
   const { allocations, loading, error, reload } = useStandingAllocations();
   const { entries, reload: reloadEntries } = useAllocationEntries();
 
+  const [subTab, setSubTab] = useState<'activities' | 'info'>('activities');
   const [year, setYear] = useState(new Date().getFullYear());
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StandingAllocationRow | null>(null);
@@ -84,10 +105,20 @@ export function AllocationsPage() {
           </button>
         </div>
       </div>
-      <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: -6, marginBottom: 14 }}>
-        Pre-approved activities run outside UnitedBML but funded from the UBML account.
-      </p>
 
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        <button className={`tab ${subTab === 'activities' ? 'active' : ''}`} onClick={() => setSubTab('activities')}>
+          Activities
+        </button>
+        <button className={`tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
+          Info
+        </button>
+      </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={ALLOCATIONS_INFO} />}
+
+      {subTab === 'activities' && (
+      <>
       <div className="toolbar" style={{ marginBottom: 14 }}>
         <div className="filters">
           <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
@@ -174,6 +205,8 @@ export function AllocationsPage() {
           </tbody>
         </table>
       </div>
+      </>
+      )}
 
       <AllocationFormModal
         open={formOpen}

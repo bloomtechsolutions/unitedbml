@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import type { CommitteeMemberRow, StaffRow } from '../../types/database';
@@ -23,7 +24,22 @@ import {
 
 type StatusFilter = '' | 'Assigned' | 'Vacant' | EffectiveAvailability;
 type SortKey = 'position' | 'member' | 'group' | 'status';
-type PageTab = 'positions' | 'structure' | 'directory';
+type PageTab = 'positions' | 'structure' | 'directory' | 'info';
+
+const COMMITTEE_INFO = [
+  {
+    q: 'What is the Positions tab?',
+    a: 'Every committee slot, its current holder, availability, and term dates. Editing here is what drives who has committee access across the rest of the app.',
+  },
+  {
+    q: 'What is the Structure tab?',
+    a: 'How positions relate to each other — the reporting shape of the committee.',
+  },
+  {
+    q: 'What is the Directory for?',
+    a: 'A searchable contact list across the whole committee — the quickest way to look someone up.',
+  },
+];
 
 function initials(name: string | null): string {
   if (!name) return '—';
@@ -271,7 +287,12 @@ export function CommitteePage() {
         <button className={`tab ${pageTab === 'directory' ? 'active' : ''}`} onClick={() => setPageTab('directory')}>
           Directory
         </button>
+        <button className={`tab ${pageTab === 'info' ? 'active' : ''}`} onClick={() => setPageTab('info')}>
+          Info
+        </button>
       </div>
+
+      {pageTab === 'info' && <PageInfoPanel sections={COMMITTEE_INFO} />}
 
       {pageTab === 'positions' && (
         <>

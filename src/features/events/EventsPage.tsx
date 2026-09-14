@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useToast } from '../../lib/ToastContext';
 import type { EventRow } from '../../types/database';
 import { useEventFinanceSummary } from '../finance/useFinance';
@@ -13,7 +14,30 @@ import { createEvent, deleteEvent, updateEvent, useCommitteeMembers, useEventTyp
 
 const NO_FINANCE: FinanceStatus = { hasApproved: false, hasPending: false };
 
-type SubTab = 'overview' | 'assignments' | 'attendance' | 'archive';
+type SubTab = 'overview' | 'assignments' | 'attendance' | 'archive' | 'info';
+
+const EVENTS_INFO = [
+  {
+    q: 'What does an event\'s status mean?',
+    a: 'An event moves automatically through Planning → Ready → Event Day → Post-Event Settlement → Closed, worked out from its preparation tasks, Finance approvals, the event date, attendance, and whether Finance has closed the settlement — you never set it by hand.',
+  },
+  {
+    q: 'What is the Assignments tab for?',
+    a: "Team assignments for the event, and — for an External-scope event — tagging a Reimbursement Manager: the person who'll submit bills once the event has run outside UnitedBML.",
+  },
+  {
+    q: 'What happens in Attendance?',
+    a: 'Record the expected vs. actual roster and check-ins, and log tournament results. Winners entered here feed straight into Leaderboard achievements.',
+  },
+  {
+    q: 'Internal vs External scope — what\'s the difference?',
+    a: "Internal events run the full UnitedBML workflow end-to-end. External events are ones staff attend on the club's behalf elsewhere — they skip the Finance Requests workflow and instead use a Reimbursement Manager to submit bills for approved reimbursement, reviewed by the committee in Reimbursements.",
+  },
+  {
+    q: 'What does Archive show?',
+    a: 'Closed and cancelled events, kept for the historical record and for Reports — they stay out of the active Overview list.',
+  },
+];
 
 export function EventsPage() {
   const { events, loading, error, reload } = useEvents();
@@ -160,12 +184,14 @@ export function EventsPage() {
       </div>
 
       <div className="tabs">
-        {(['overview', 'assignments', 'attendance', 'archive'] as SubTab[]).map((t) => (
+        {(['overview', 'assignments', 'attendance', 'archive', 'info'] as SubTab[]).map((t) => (
           <button key={t} className={`tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
-            {t === 'overview' ? 'Event Overview' : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'overview' ? 'Event Overview' : t === 'info' ? 'Info' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={EVENTS_INFO} />}
 
       {subTab === 'overview' && (
         <>

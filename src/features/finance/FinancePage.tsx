@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { useStandingAllocationsActual } from '../allocations/useAllocations';
@@ -28,7 +29,34 @@ import {
   useReversals,
 } from './useFinance';
 
-type SubTab = 'dashboard' | 'requests' | 'approvals' | 'reversals' | 'settlements' | 'contingency' | 'budget' | 'exco';
+type SubTab = 'dashboard' | 'requests' | 'approvals' | 'reversals' | 'settlements' | 'contingency' | 'budget' | 'exco' | 'info';
+
+const FINANCE_INFO = [
+  {
+    q: 'How does an expense request get approved?',
+    a: 'An Inputter raises the request against an event or line item. It then needs President Recommendation (a committee sign-off), then Email Final Approval — sent out for the final decision-maker\'s approval by email. Once Approved, the amount counts against the annual budget immediately, before any money has actually moved.',
+  },
+  {
+    q: 'What is a Settlement?',
+    a: "After the activity happens, someone enters the actual amount spent to close out the request. It's capped so it can never exceed the approved amount — both in the form and again on the server — so an over-run always has to go through Contingency or a fresh request instead of slipping through at close-out.",
+  },
+  {
+    q: 'What is Contingency for?',
+    a: 'A controlled top-up when a line item runs short of its approved amount. It routes: requested → President recommendation → sent to Procurement by email → their decision recorded, with the released amount tracked separately from the original approval.',
+  },
+  {
+    q: 'What can I do in Reversals?',
+    a: 'Request that an approved amount be released back to the budget — useful if a request is cancelled or reduced after approval. A committee member approves or rejects the reversal; approving it frees the amount back into Available Balance.',
+  },
+  {
+    q: 'What sets the Available Balance figure?',
+    a: 'Annual Budget minus everything currently committed against it: approved expense requests, plus this year\'s Standing Allocations actuals (Fun with Team, UBML Allowance, Women\'s/Men\'s Day, Year End Activities) reported monthly by Finance.',
+  },
+  {
+    q: 'What is the Exco Report?',
+    a: 'A ready-made export of the current budget position for the executive committee — the same figures shown on the Dashboard tab, formatted for sharing.',
+  },
+];
 
 export function FinancePage() {
   const { budget, loading: budgetLoading, reload: reloadBudget } = useBudget();
@@ -152,7 +180,12 @@ export function FinancePage() {
         <button className={`tab ${subTab === 'exco' ? 'active' : ''}`} onClick={() => setSubTab('exco')}>
           Exco Report
         </button>
+        <button className={`tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
+          Info
+        </button>
       </div>
+
+      {subTab === 'info' && <PageInfoPanel sections={FINANCE_INFO} />}
 
       {subTab === 'dashboard' && (
         <FinanceDashboardTab
