@@ -941,6 +941,16 @@ export interface Database {
         Insert: Partial<PublicHolidayRow>;
         Update: Partial<PublicHolidayRow>;
       };
+      event_reports: {
+        Row: EventReportRow;
+        Insert: Partial<EventReportRow>;
+        Update: Partial<EventReportRow>;
+      };
+      event_report_photos: {
+        Row: EventReportPhotoRow;
+        Insert: Partial<EventReportPhotoRow>;
+        Update: Partial<EventReportPhotoRow>;
+      };
     };
   };
 }
@@ -995,5 +1005,41 @@ export interface StandingAllocationEntryRow {
   source_reference: string | null;
   recorded_by: string | null;
   recorded_by_name: string | null;
+  created_at: string;
+}
+
+export type EventReportStatus = 'Draft' | 'Submitted' | 'Approved' | 'Returned';
+
+export interface EventReportRow {
+  id: string;
+  event_id: string;
+  staff_attended: number;
+  volunteers_count: number;
+  no_show_count: number;
+  highlights: string | null;
+  feedback_rating: number | null;
+  feedback_text: string | null;
+  challenges: string | null;
+  recommendations: string | null;
+  status: EventReportStatus;
+  submitted_by: string | null;
+  submitted_by_name: string | null;
+  submitted_at: string | null;
+  president_decision: string | null;
+  president_comment: string | null;
+  decided_by_name: string | null;
+  decided_by_role: string | null;
+  decided_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventReportPhotoRow {
+  id: string;
+  event_report_id: string;
+  storage_path: string;
+  caption: string | null;
+  sort_order: number;
+  uploaded_by: string | null;
   created_at: string;
 }

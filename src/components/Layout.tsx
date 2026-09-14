@@ -79,6 +79,7 @@ const NAV_AREAS: NavArea[] = [
     subItems: [
       { to: '/events', label: 'Events & Activities' },
       { to: '/events-calendar', label: 'Event Calendar' },
+      { to: '/event-reports', label: 'Event Reports' },
     ],
   },
   {
