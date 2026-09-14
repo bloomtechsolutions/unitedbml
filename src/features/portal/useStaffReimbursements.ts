@@ -1,9 +1,19 @@
 import { useMemo } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import type { EventRow } from '../../types/database';
-import { apPaidTotal, apSubmittedTotal, useEligibleExpenseRequests, useReimbursementCases } from '../reimbursements/useReimbursements';
+import { apPaidTotal, useEligibleExpenseRequests, useReimbursementCases } from '../reimbursements/useReimbursements';
 import type { ApBatchWithBills, EligibleExpenseRequest, ProcurementGroupCase } from '../reimbursements/types';
 import { useMyManagedEvents } from './usePortal';
+
+/** Everything the Manager has put forward for a case, whether or not AP has been sent yet —
+ * unlike apSubmittedTotal (which only counts batches already sent to AP), this counts a
+ * still-Draft/pending-review batch too, since from the Manager's perspective they've already
+ * "submitted" it the moment they send it for committee review. */
+export function managerSubmittedTotal(batches: ApBatchWithBills[], caseId: string): number {
+  return batches
+    .filter((b) => b.reimbursement_id === caseId && b.status !== 'Cancelled')
+    .reduce((sum, b) => sum + b.bills.reduce((s, bill) => s + bill.amount, 0), 0);
+}
 
 export interface ManagedEventSummary {
   event: EventRow;
@@ -31,7 +41,7 @@ export function useStaffReimbursementWorkspace() {
       const eventEligible = eligible.filter((e) => e.eventId === event.id);
       const approvedFromCases = eventCases.reduce((s, c) => s + c.approved_item_amount, 0);
       const approvedFromEligible = eventEligible.reduce((s, r) => s + r.lines.reduce((ss, l) => ss + l.amount, 0), 0);
-      const submittedTotal = eventCases.reduce((s, c) => s + apSubmittedTotal(batches, c.id), 0);
+      const submittedTotal = eventCases.reduce((s, c) => s + managerSubmittedTotal(batches, c.id), 0);
       const paidTotal = eventCases.reduce((s, c) => s + apPaidTotal(batches, c.id), 0);
       const pendingReviewCount = batches.filter((b) => eventCases.some((c) => c.id === b.reimbursement_id) && b.pending_review).length;
       const approvedTotal = approvedFromCases + approvedFromEligible;

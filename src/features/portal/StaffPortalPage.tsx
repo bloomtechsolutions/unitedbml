@@ -4,9 +4,8 @@ import { useState } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { ApBatchModal } from '../reimbursements/ApBatchModal';
-import { apSubmittedTotal } from '../reimbursements/useReimbursements';
 import type { ApBatchWithBills, ProcurementGroupCase } from '../reimbursements/types';
-import { latestBatchForCase, useStaffReimbursementWorkspace, type ManagedEventSummary } from './useStaffReimbursements';
+import { latestBatchForCase, managerSubmittedTotal, useStaffReimbursementWorkspace, type ManagedEventSummary } from './useStaffReimbursements';
 
 function money(n: number): string {
   return `MVR ${Math.round(n).toLocaleString()}`;
@@ -21,7 +20,8 @@ function CaseRow({
   batches: ApBatchWithBills[];
   onOpen: (c: ProcurementGroupCase, b: ApBatchWithBills | null) => void;
 }) {
-  const submitted = apSubmittedTotal(batches, caseItem.id);
+  const [expanded, setExpanded] = useState(false);
+  const submitted = managerSubmittedTotal(batches, caseItem.id);
   const remaining = caseItem.approved_item_amount - submitted;
   const batch = latestBatchForCase(batches, caseItem.id);
 
@@ -35,7 +35,7 @@ function CaseRow({
     if (batch.pending_review) {
       statusLabel = 'Pending Committee Review';
       pillClass = 'ub-pill-warning';
-      actionLabel = 'View Submission';
+      actionLabel = 'Edit Submission';
     } else if (batch.status === 'Draft') {
       statusLabel = 'Reviewed — Awaiting AP';
       pillClass = 'ub-pill-success';
@@ -52,33 +52,107 @@ function CaseRow({
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 10,
-        padding: '10px 4px',
-        borderBottom: '1px solid var(--ub-border-2)',
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700 }}>{caseItem.expense_item}</div>
-        <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>
-          Approved {money(caseItem.approved_item_amount)} · Submitted {money(submitted)} · Balance {money(remaining)}
+    <div style={{ borderBottom: '1px solid var(--ub-border-2)' }}>
+      <div
+        onClick={() => setExpanded((v) => !v)}
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          padding: '10px 4px',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ display: 'inline-block', transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--ub-ink-faint)' }}>
+            ▸
+          </span>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{caseItem.expense_item}</div>
+            <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>
+              Approved {money(caseItem.approved_item_amount)} · Submitted {money(submitted)} · Balance {money(remaining)}
+            </div>
+          </div>
         </div>
-        {batch?.status_remarks && <div style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)', marginTop: 2 }}>{batch.status_remarks}</div>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+          <span className={`ub-pill ${pillClass}`} style={{ whiteSpace: 'nowrap' }}>
+            {statusLabel}
+          </span>
+          {actionLabel && (
+            <button
+              className="ub-btn ub-btn-ghost"
+              style={{ padding: '6px 12px', fontSize: 12 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(caseItem, openBatch);
+              }}
+            >
+              {actionLabel}
+            </button>
+          )}
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
-        <span className={`ub-pill ${pillClass}`} style={{ whiteSpace: 'nowrap' }}>
-          {statusLabel}
-        </span>
-        {actionLabel && (
-          <button className="ub-btn ub-btn-ghost" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => onOpen(caseItem, openBatch)}>
-            {actionLabel}
-          </button>
-        )}
-      </div>
+
+      {expanded && (
+        <div style={{ padding: '0 4px 14px 26px' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 18,
+              flexWrap: 'wrap',
+              fontSize: 12,
+              padding: '10px 12px',
+              background: 'var(--ub-surface-2)',
+              borderRadius: 10,
+              marginBottom: 10,
+            }}
+          >
+            <span>
+              <b>{money(caseItem.approved_item_amount)}</b> approved
+            </span>
+            <span>
+              <b>{money(submitted)}</b> submitted
+            </span>
+            <span style={{ color: remaining < 0 ? 'var(--ub-danger)' : undefined }}>
+              <b>{money(remaining)}</b> balance remaining
+            </span>
+          </div>
+
+          {batch?.status_remarks && (
+            <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 10 }}>Committee remarks: {batch.status_remarks}</div>
+          )}
+
+          {!batch?.bills.length && <p className="ub-empty" style={{ padding: '14px 0' }}>No bills submitted yet.</p>}
+
+          {!!batch?.bills.length && (
+            <table className="ub-table" style={{ fontSize: 12.5 }}>
+              <thead>
+                <tr>
+                  <th>Bill Date</th>
+                  <th>Vendor</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batch.bills.map((bill) => (
+                  <tr key={bill.id}>
+                    <td>{bill.bill_date || '—'}</td>
+                    <td>{bill.vendor_name || '—'}</td>
+                    <td>{money(bill.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ fontWeight: 700 }}>
+                  <td colSpan={2}>Total</td>
+                  <td>{money(batch.bills.reduce((s, b) => s + b.amount, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }
