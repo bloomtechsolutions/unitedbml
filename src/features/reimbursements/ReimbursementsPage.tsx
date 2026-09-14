@@ -333,15 +333,16 @@ export function ReimbursementsPage() {
                     <span className={`ap-status ${b.status.replace(/[\s/]/g, '')}`}>{b.status}</span>
                     {b.pending_review && (
                       <div style={{ marginTop: 4 }}>
-                        {b.return_reason ? (
-                          <span className="pill" style={{ background: '#fff0f4', color: '#b43554' }}>
-                            Returned to Manager
-                          </span>
-                        ) : (
-                          <span className="pill" style={{ background: '#fff4db', color: '#946100' }}>
-                            Pending Review{b.manager_submitted_by ? ` · ${b.manager_submitted_by}` : ''}
-                          </span>
-                        )}
+                        <span className="pill" style={{ background: '#fff4db', color: '#946100' }}>
+                          Pending Review{b.manager_submitted_by ? ` · ${b.manager_submitted_by}` : ''}
+                        </span>
+                      </div>
+                    )}
+                    {!b.pending_review && b.return_reason && (
+                      <div style={{ marginTop: 4 }}>
+                        <span className="pill" style={{ background: '#fff0f4', color: '#b43554' }} title={b.return_reason}>
+                          Returned to Manager
+                        </span>
                       </div>
                     )}
                     {b.status_remarks && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{b.status_remarks}</div>}

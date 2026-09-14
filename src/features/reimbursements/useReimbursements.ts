@@ -330,7 +330,8 @@ export async function saveApBatchDraft(
   caseId: string,
   bills: Omit<ApBillRow, 'id' | 'ap_batch_id'>[],
   apEmail: string,
-  managerSubmission?: ManagerSubmission
+  managerSubmission?: ManagerSubmission,
+  isManagerBatch?: boolean
 ) {
   const id = batchId ?? crypto.randomUUID();
   if (!batchId) {
@@ -352,11 +353,16 @@ export async function saveApBatchDraft(
         : {}),
     } satisfies Partial<ApBatchRow>);
     if (error) throw error;
-  } else {
+  } else if (isManagerBatch) {
+    // Editing/resubmitting the Manager's own batch — put it back in front of the committee and
+    // clear any earlier return, regardless of whether it was still pending or had been returned.
     const { error } = await supabase
       .from('ap_batches')
-      .update({ ap_email: apEmail || null, return_reason: null, returned_by: null, returned_at: null })
+      .update({ ap_email: apEmail || null, pending_review: true, return_reason: null, returned_by: null, returned_at: null })
       .eq('id', id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('ap_batches').update({ ap_email: apEmail || null }).eq('id', id);
     if (error) throw error;
   }
 

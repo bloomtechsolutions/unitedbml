@@ -130,25 +130,38 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
   const remaining = caseItem.approved_item_amount - apCommittedTotal(batches, caseItem.id, existingBatch?.id);
   const billsTotal = bills.reduce((sum, b) => sum + (b.amount || 0), 0);
 
-  // A batch already reviewed (or not built by the assigned Manager) can be sent normally; a
-  // fresh submission from the assigned Manager must go through committee review first.
   const isManagerSubmission = !!eventManagerUserId && !!session?.user.id && session.user.id === eventManagerUserId;
-  const needsReview = existingBatch ? existingBatch.pending_review : isManagerSubmission;
-  // Once a committee member reviews a Manager's submission, the Manager loses write access to it
-  // (enforced by RLS) — reflect that here instead of letting them hit a failed save.
+  // Whether this whole batch belongs to the Manager-review workflow — either a fresh submission
+  // from the assigned Manager, or an existing batch that was originally submitted that way.
+  const isManagerBatch = existingBatch ? existingBatch.submitted_by_manager : isManagerSubmission;
+  const isReturned = !!existingBatch?.return_reason;
+  // Once a committee member approves a Manager's submission (and it hasn't since been returned),
+  // the Manager loses write access to it (enforced by RLS) — reflect that here instead of letting
+  // them hit a failed save. A returned batch stays editable so they can fix and resubmit it.
   const readOnlyForManager =
-    !isCommitteeUser && !!existingBatch && existingBatch.submitted_by_manager && !existingBatch.pending_review;
+    !isCommitteeUser && !!existingBatch && existingBatch.submitted_by_manager && !existingBatch.pending_review && !isReturned;
+  // Only committee ever sends directly — and only once nothing is still awaiting their own
+  // decision (a batch still pending review, or freshly returned, goes through Review instead).
+  const canSend = isCommitteeUser && !existingBatch?.pending_review && !isReturned;
 
   const updateBill = (key: string, patch: Partial<DraftBill>) => {
     setBills((prev) => prev.map((b) => (b._key === key ? { ...b, ...patch } : b)));
   };
 
   const handleSaveDraft = async (send: boolean) => {
+    if (!bills.length) {
+      setError('Add at least one bill before saving.');
+      return;
+    }
+    if (bills.some((b) => !(b.amount > 0))) {
+      setError('Every bill needs an amount greater than zero — remove any empty rows or fill them in.');
+      return;
+    }
     if (billsTotal > remaining + 0.01) {
       setError(`Total bills (${billsTotal.toLocaleString()}) exceed the remaining approved balance (${remaining.toLocaleString()}).`);
       return;
     }
-    if (send && needsReview) {
+    if (send && !canSend) {
       setError('This submission needs committee review before it can be sent to Accounts Payable.');
       return;
     }
@@ -163,7 +176,8 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         apEmail,
         !existingBatch && isManagerSubmission
           ? { managerUserId: session!.user.id, managerName: profile?.full_name || profile?.email || 'Unknown' }
-          : undefined
+          : undefined,
+        isManagerBatch
       );
 
       if (attachmentMode === 'Combined' && combinedFile) {
@@ -321,11 +335,23 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         </div>
       )}
 
-      {!readOnlyForManager && needsReview && (
+      {!readOnlyForManager && isReturned && (
+        <div className="ub-banner ub-banner-warning" style={{ marginTop: 16 }}>
+          Returned by {existingBatch?.returned_by || 'the committee'}: {existingBatch?.return_reason}
+        </div>
+      )}
+
+      {!readOnlyForManager && !isReturned && isManagerBatch && !isCommitteeUser && (
         <div className="ub-banner ub-banner-accent" style={{ marginTop: 16 }}>
-          {existingBatch?.reviewed_at
-            ? 'Reviewed — this batch can now be sent to Accounts Payable.'
-            : "As the assigned Reimbursement Manager, this batch is saved for committee review before it can be sent to Accounts Payable — you won't be able to send it yourself."}
+          As the assigned Reimbursement Manager, this batch is saved for committee review before it can be sent to
+          Accounts Payable — you won't be able to send it yourself.
+        </div>
+      )}
+
+      {!readOnlyForManager && isCommitteeUser && existingBatch?.pending_review && (
+        <div className="ub-banner ub-banner-accent" style={{ marginTop: 16 }}>
+          This is a pending submission from the Reimbursement Manager — use Review in AP Submissions to approve and
+          send it, or to return it with a reason.
         </div>
       )}
 
@@ -339,10 +365,10 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         </button>
         {!readOnlyForManager && (
           <button className="btn soft" onClick={() => void handleSaveDraft(false)} disabled={saving}>
-            {needsReview && !existingBatch ? 'Submit for Committee Review' : 'Save Draft'}
+            {isManagerBatch && !isCommitteeUser ? (existingBatch ? (isReturned ? 'Resubmit for Review' : 'Save Draft') : 'Submit for Committee Review') : 'Save Draft'}
           </button>
         )}
-        {!readOnlyForManager && !needsReview && (
+        {!readOnlyForManager && canSend && (
           <button className="btn primary" onClick={() => void handleSaveDraft(true)} disabled={saving}>
             {saving ? 'Sending…' : 'Send AP Email + Attachments'}
           </button>

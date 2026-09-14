@@ -13,7 +13,7 @@ function money(n: number): string {
 }
 
 function batchStatusInfo(batch: ApBatchWithBills): { label: string; pillClass: string } {
-  if (batch.pending_review && batch.return_reason) return { label: 'Returned — Needs Changes', pillClass: 'ub-pill-danger' };
+  if (batch.return_reason) return { label: 'Returned — Needs Changes', pillClass: 'ub-pill-danger' };
   if (batch.pending_review) return { label: 'Pending Committee Review', pillClass: 'ub-pill-warning' };
   if (batch.status === 'Draft') return { label: 'Reviewed — Awaiting AP', pillClass: 'ub-pill-success' };
   if (batch.status === 'Paid') return { label: 'Paid', pillClass: 'ub-pill-success' };
@@ -48,7 +48,7 @@ function CaseRow({
     const info = batchStatusInfo(draft);
     statusLabel = info.label;
     pillClass = info.pillClass;
-    actionLabel = draft.pending_review ? (draft.return_reason ? 'Edit & Resubmit' : 'Edit Submission') : 'View';
+    actionLabel = draft.return_reason ? 'Edit & Resubmit' : draft.pending_review ? 'Edit Submission' : 'View';
   } else if (remaining <= 0.01) {
     statusLabel = 'Fully submitted';
     pillClass = 'ub-pill-success';
@@ -139,7 +139,7 @@ function CaseRow({
                   </span>
                 </div>
 
-                {batch.pending_review && batch.return_reason && (
+                {batch.return_reason && (
                   <div className="ub-banner ub-banner-warning" style={{ marginBottom: 8 }}>
                     Returned by {batch.returned_by || 'the committee'}: {batch.return_reason}
                   </div>
