@@ -461,20 +461,24 @@ export async function sendApBatch(batch: ApBatchWithBills, caseItem: Procurement
       }
     }
 
+    const billsTotal = batch.bills.reduce((s, b) => s + Number(b.amount ?? 0), 0);
     const html = outlookEmailTemplate({
-      heading: 'Accounts Payable Submission',
-      intro: `Please find attached the approved bill(s) for ${caseItem.expense_item} for processing and payment.`,
+      heading: 'Reimbursement Submissions',
+      intro: 'Dear Team, please find below the expenses of UBML to be processed as reimbursement.',
       rows: [
         { label: 'Submission Reference', value: batch.submission_ref ?? '' },
         { label: 'Reimbursement Case', value: caseItem.case_ref ?? '' },
         { label: 'Event / Activity', value: caseItem.event_name || 'General (no linked event)' },
+        { label: 'Expense Line', value: caseItem.expense_item ?? '' },
       ],
       itemsTable: {
-        headers: ['Vendor', 'Bill Date', 'Amount (MVR)'],
-        rows: batch.bills.map((b) => [b.vendor_name ?? '', b.bill_date ?? '', Number(b.amount ?? 0).toLocaleString()]),
+        headers: ['Vendor', 'Vendor Number', 'Bill Date', 'Amount (MVR)'],
+        rows: [
+          ...batch.bills.map((b) => [b.vendor_name ?? '', b.vendor_number ?? '', b.bill_date ?? '', Number(b.amount ?? 0).toLocaleString()]),
+          ['', '', 'Total Amount', `MVR ${billsTotal.toLocaleString()}`],
+        ],
       },
-      totalLabel: 'Total Amount',
-      totalValue: `MVR ${batch.bills.reduce((s, b) => s + Number(b.amount ?? 0), 0).toLocaleString()}`,
+      note: 'Please find attached the Expense Approval Note along with the bills.',
       signatureName: actorName,
       signatureRole: 'Treasurer',
       signatureEmail: '',
@@ -482,7 +486,7 @@ export async function sendApBatch(batch: ApBatchWithBills, caseItem: Procurement
 
     const result = await sendEmail({
       to: batch.ap_email,
-      subject: `AP Submission: ${batch.submission_ref} - ${caseItem.expense_item}`,
+      subject: `Reimbursement Submission: ${batch.submission_ref} - ${caseItem.expense_item}`,
       html,
       attachments,
       emailType: 'AP Submission',

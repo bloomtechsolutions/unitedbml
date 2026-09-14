@@ -146,6 +146,7 @@ export function outlookEmailTemplate(opts: {
   itemsTable?: { headers: string[]; rows: string[][] };
   totalLabel?: string;
   totalValue?: string;
+  note?: string;
   advisory?: string;
   boxedNote?: { label: string; value: string };
   ctaButton?: { label: string; href: string };
@@ -153,7 +154,8 @@ export function outlookEmailTemplate(opts: {
   signatureRole: string;
   signatureEmail: string;
 }): string {
-  const { heading, intro, rows, itemsTable, totalLabel, totalValue, advisory, boxedNote, ctaButton, signatureName, signatureRole, signatureEmail } = opts;
+  const { heading, intro, rows, itemsTable, totalLabel, totalValue, note, advisory, boxedNote, ctaButton, signatureName, signatureRole, signatureEmail } =
+    opts;
   const rowsHtml = rows
     .map(
       (r) =>
@@ -180,6 +182,10 @@ export function outlookEmailTemplate(opts: {
           <td style="padding:8px 10px;background:#eff6ff;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1d4ed8;font-weight:bold;text-align:right;">${totalValue}</td></tr>
         </table>`
       : '';
+
+  const noteHtml = note
+    ? `<p style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#374151;margin:0 0 14px;">${note}</p>`
+    : '';
 
   const advisoryHtml = advisory
     ? `<p style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;padding:10px 12px;margin:0 0 14px;">${advisory}</p>`
@@ -220,6 +226,7 @@ export function outlookEmailTemplate(opts: {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:6px;">${rowsHtml}</table>
     ${itemsHtml}
     ${totalHtml}
+    ${noteHtml}
     ${boxedNoteHtml}
     ${advisoryHtml}
     ${ctaButtonHtml}
