@@ -41,6 +41,51 @@ export async function expenseRegister(): Promise<ReportResult> {
   };
 }
 
+export async function fullExpenseBreakdown(): Promise<ReportResult> {
+  const [requests, lines] = await Promise.all([
+    all<Record<string, unknown>>('expense_requests'),
+    all<Record<string, unknown>>('expense_lines'),
+  ]);
+  const requestById = new Map(requests.map((r) => [r.id as string, r]));
+  return {
+    columns: [
+      col('request_number', 'Request #', text),
+      col('title', 'Request Title', text),
+      col('event_name', 'Event', text),
+      col('description', 'Line Item', text),
+      col('quantity', 'Qty', num),
+      col('rate', 'Rate', money),
+      col('line_total', 'Amount', money),
+      col('vendor', 'Vendor', text),
+      col('reimbursement_required', 'Reimbursable', text),
+      col('requested_by', 'Requested By', text),
+      col('status', 'Request Status', status),
+      col('request_date', 'Date', date),
+    ],
+    rows: lines.map((l) => {
+      const r = requestById.get(l.expense_request_id as string);
+      return {
+        request_number: (r?.request_number as string) ?? null,
+        title: (r?.title as string) ?? null,
+        event_name: (r?.event_name as string) ?? null,
+        description: l.description,
+        quantity: l.quantity,
+        rate: l.rate,
+        line_total: l.line_total,
+        vendor: l.vendor ?? null,
+        reimbursement_required: l.reimbursement_required ? 'Yes' : 'No',
+        requested_by: (r?.requested_by as string) ?? null,
+        status: (r?.status as string) ?? null,
+        request_date: (r?.request_date as string) ?? null,
+        _date: (r?.request_date as string) ?? null,
+        _eventId: (r?.event_id as string) ?? null,
+        _eventName: (r?.event_name as string) ?? null,
+        _status: (r?.status as string) ?? null,
+      };
+    }),
+  };
+}
+
 export async function approvalStatus(): Promise<ReportResult> {
   const requests = await all<Record<string, unknown>>('expense_requests');
   return {
@@ -266,16 +311,21 @@ export async function apRegister(): Promise<ReportResult> {
       col('bill_count', 'Bills', num),
       col('amount', 'Amount', money),
       col('status', 'Status', status),
+      col('submitted_by', 'Submitted By', text),
+      col('review_status', 'Review', text),
     ],
     rows: batches.map((b) => {
       const parentCase = caseById.get(b.reimbursement_id as string);
       const billStats = billsByBatch.get(b.id as string) ?? { count: 0, total: 0 };
+      const reviewStatus = b.return_reason ? 'Returned to Manager' : b.pending_review ? 'Pending Review' : b.reviewed_by ? 'Reviewed' : '';
       return {
         ...b,
         case_ref: parentCase?.case_ref ?? '',
         event_name: parentCase?.event_name ?? '',
         bill_count: billStats.count,
         amount: billStats.total,
+        submitted_by: b.submitted_by_manager ? (b.manager_submitted_by ?? 'Reimbursement Manager') : '',
+        review_status: reviewStatus,
         _date: (b.submission_date as string) ?? null,
         _eventId: parentCase?.event_id ?? null,
         _eventName: parentCase?.event_name ?? null,
@@ -504,6 +554,8 @@ export async function runReport(id: string, month: string): Promise<ReportResult
   switch (id) {
     case 'expense-register':
       return expenseRegister();
+    case 'full-expense-breakdown':
+      return fullExpenseBreakdown();
     case 'approval-status':
       return approvalStatus();
     case 'budget-utilization':

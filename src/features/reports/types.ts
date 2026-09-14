@@ -43,6 +43,12 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'Finance & Budget',
   },
   {
+    id: 'full-expense-breakdown',
+    title: 'Full Expense Breakdown',
+    description: 'Every expense line item, across every request, with vendor, event, requester and status — the complete itemized breakdown.',
+    category: 'Finance & Budget',
+  },
+  {
     id: 'approval-status',
     title: 'Expense Approval Status',
     description: 'Current approval stage per request.',
