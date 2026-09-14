@@ -109,34 +109,33 @@ export function ReimbursementsPage() {
       <div className="reimb-hero">
         <div>
           <h2>Reimbursements</h2>
-          <p>Procurement pre-approval, AP batch submission, and payment status for reimbursable expenses.</p>
         </div>
       </div>
 
-      <div className="reimb-kpis">
-        <div className="kpi">
-          <div className="lbl">Total Cases</div>
-          <strong>{lineCases.length}</strong>
+      <div className="ub-kpi-strip">
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{lineCases.length}</span>
+          <span className="ub-kpi-strip-label">Total Cases</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Awaiting Procurement</div>
-          <strong>{awaitingGroups.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{awaitingGroups.length}</span>
+          <span className="ub-kpi-strip-label">Awaiting Procurement</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Pre-Approved</div>
-          <strong>{preApproved.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{preApproved.length}</span>
+          <span className="ub-kpi-strip-label">Pre-Approved</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Exceptions</div>
-          <strong>{exceptions.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{exceptions.length}</span>
+          <span className="ub-kpi-strip-label">Exceptions</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Submitted to AP</div>
-          <strong>{nonCancelledBatches.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{nonCancelledBatches.length}</span>
+          <span className="ub-kpi-strip-label">Submitted to AP</span>
         </div>
-        <div className="kpi">
-          <div className="lbl">Paid</div>
-          <strong>{paidBatches.length}</strong>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{paidBatches.length}</span>
+          <span className="ub-kpi-strip-label">Paid</span>
         </div>
       </div>
 
@@ -164,6 +163,10 @@ export function ReimbursementsPage() {
       {subTab === 'cases' && (
         <div>
           <h4>Eligible Approved Expense Items</h4>
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
+            Approved expense requests ready for reimbursement. Send an item for Standard Procurement pre-approval, or
+            record it as a No Pre-Approval / Exception case if it was already paid or doesn't need one.
+          </p>
           {eligible.map((request) => (
             <div key={request.expenseRequestId} className="reimb-card">
               <div className="reimb-card-head">
@@ -192,6 +195,10 @@ export function ReimbursementsPage() {
           {!eligible.length && <p style={{ color: 'var(--muted)' }}>No approved expense items awaiting reimbursement processing.</p>}
 
           <h4 style={{ marginTop: 20 }}>Reimbursement Cases</h4>
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
+            Once a case is Pre-Approved or has an Exception recorded, submit it into an AP Batch for payment.
+          </p>
+          <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
@@ -248,6 +255,7 @@ export function ReimbursementsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -394,7 +402,7 @@ export function ReimbursementsPage() {
                   {r.vendor_name || 'No vendor'} · {r.expense_date} · {r.reference_no || 'No reference'}
                 </small>
               </div>
-              <div>${r.amount.toFixed(2)}</div>
+              <div>MVR {r.amount.toFixed(2)}</div>
               <div>{r.official_role || 'Official'}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="btn ghost" disabled={decidingId === r.id} onClick={() => void decideExternal(r.id, false)}>
