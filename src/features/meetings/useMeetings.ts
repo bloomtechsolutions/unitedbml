@@ -256,7 +256,8 @@ export async function createEventFromAgendaItem(
 ) {
   const eventId = String(Date.now());
   const requiredItems = (agenda.data as { requiredItems?: RequiredItem[] } | null)?.requiredItems ?? [];
-  const itemsTotal = requiredItems.reduce((sum, item) => sum + (item.quantity || 0) * (item.amount || 0), 0);
+  const itemsSubtotal = requiredItems.reduce((sum, item) => sum + (item.quantity || 0) * (item.amount || 0), 0);
+  const itemsTotal = itemsSubtotal ? Math.round(itemsSubtotal * 1.05 * 100) / 100 : 0;
 
   let plannedBudget = itemsTotal;
   if (!itemsTotal) {

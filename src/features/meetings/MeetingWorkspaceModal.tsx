@@ -283,6 +283,16 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                           </span>
                         </div>
                       ))}
+                      {(() => {
+                        const subtotal = requiredItems.reduce((s, ri) => s + (ri.quantity || 1) * (ri.amount || 0), 0);
+                        const contingency = Math.round(subtotal * 0.05 * 100) / 100;
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 0 0', marginTop: 4, borderTop: '1px solid var(--ub-border)', fontWeight: 700 }}>
+                            <span>Planned Budget (incl. 5% contingency)</span>
+                            <span>MVR {(subtotal + contingency).toLocaleString()}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

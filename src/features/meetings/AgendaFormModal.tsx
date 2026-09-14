@@ -58,6 +58,9 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
   }, [open, editing]);
 
   const isCustomOutcome = !STANDARD_OUTCOMES.includes(values.outcome);
+  const itemsSubtotal = values.requiredItems.reduce((sum, item) => sum + (item.quantity || 0) * (item.amount || 0), 0);
+  const itemsContingency = Math.round(itemsSubtotal * 0.05 * 100) / 100;
+  const itemsTotalWithContingency = itemsSubtotal + itemsContingency;
 
   const updateItem = (id: string, patch: Partial<RequiredItem>) => {
     setValues((v) => ({ ...v, requiredItems: v.requiredItems.map((it) => (it.id === id ? { ...it, ...patch } : it)) }));
@@ -165,7 +168,8 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
         </div>
         <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ub-ink-faint)' }}>
           Optional — only matters if this item becomes an event. Listed here so they carry onto the event, and pre-fill its
-          Expense Request line items automatically. You don't need to set Outcome first.
+          Expense Request line items automatically. You don't need to set Outcome first. A 5% contingency is added to the
+          items subtotal to set the event's Planned Budget.
         </p>
         {values.requiredItems.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -203,6 +207,17 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
                 </button>
               </div>
             ))}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24, marginTop: 4, fontSize: 12.5 }}>
+              <div style={{ color: 'var(--ub-ink-faint)' }}>
+                Subtotal: <b style={{ color: 'var(--ub-ink-soft)' }}>{itemsSubtotal.toLocaleString()}</b>
+              </div>
+              <div style={{ color: 'var(--ub-ink-faint)' }}>
+                Contingency (5%): <b style={{ color: 'var(--ub-ink-soft)' }}>{itemsContingency.toLocaleString()}</b>
+              </div>
+              <div>
+                Planned Budget: <b>{itemsTotalWithContingency.toLocaleString()}</b>
+              </div>
+            </div>
           </div>
         )}
         <button
