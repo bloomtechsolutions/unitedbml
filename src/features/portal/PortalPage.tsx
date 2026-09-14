@@ -128,7 +128,7 @@ function CommitteePortalPage() {
             {myApprovals.map((r) => (
               <Link
                 key={r.id}
-                href="/finance"
+                href={r.href ?? '/finance'}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',

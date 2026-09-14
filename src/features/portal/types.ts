@@ -10,7 +10,8 @@ export interface MyApprovalItem {
   request_number: string | null;
   status: string;
   total_amount: number;
-  stage: 'President Recommendation' | 'Final Approval';
+  stage: 'President Recommendation' | 'Final Approval' | 'AP Batch Review';
+  href?: string;
 }
 
 export interface OfficialAssignment extends ExternalEventOfficialRow {

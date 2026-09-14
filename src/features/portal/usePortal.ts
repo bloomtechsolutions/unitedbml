@@ -103,10 +103,13 @@ export function useMyPendingApprovals(profile: Profile | null) {
       return;
     }
     setLoading(true);
-    const { data } = await supabase
-      .from('expense_requests')
-      .select('id,title,request_number,status,total_amount,final_approver_email,final_approver_name')
-      .in('status', ['Pending President Recommendation', 'Pending Final Approval']);
+    const [{ data }, { data: pendingBatches }] = await Promise.all([
+      supabase
+        .from('expense_requests')
+        .select('id,title,request_number,status,total_amount,final_approver_email,final_approver_name')
+        .in('status', ['Pending President Recommendation', 'Pending Final Approval']),
+      supabase.from('ap_batches').select('id,reimbursement_id,submission_ref,manager_submitted_by').eq('pending_review', true).eq('status', 'Draft'),
+    ]);
 
     const email = (profile.email || '').toLowerCase().trim();
     const name = (profile.full_name || '').toLowerCase().trim();
@@ -118,16 +121,44 @@ export function useMyPendingApprovals(profile: Profile | null) {
       return selected ? email === selected : (r.final_approver_name || '').toLowerCase().trim() === name;
     });
 
-    setItems(
-      mine.map((r) => ({
-        id: r.id,
-        title: r.title,
-        request_number: r.request_number,
-        status: r.status,
-        total_amount: r.total_amount ?? 0,
-        stage: r.status === 'Pending President Recommendation' ? 'President Recommendation' : 'Final Approval',
-      }))
-    );
+    const financeItems: MyApprovalItem[] = mine.map((r) => ({
+      id: r.id,
+      title: r.title,
+      request_number: r.request_number,
+      status: r.status,
+      total_amount: r.total_amount ?? 0,
+      stage: r.status === 'Pending President Recommendation' ? 'President Recommendation' : 'Final Approval',
+      href: '/finance',
+    }));
+
+    // Any committee member can review a Reimbursement Manager's submission — not just whoever it
+    // was routed to — so this list is unfiltered by approver, same as the AP Submissions tab.
+    let apReviewItems: MyApprovalItem[] = [];
+    if (pendingBatches?.length) {
+      const caseIds = [...new Set(pendingBatches.map((b) => b.reimbursement_id))];
+      const [{ data: cases }, { data: bills }] = await Promise.all([
+        supabase.from('reimbursement_cases').select('id,expense_item,event_name,case_ref').in('id', caseIds),
+        supabase
+          .from('ap_bills')
+          .select('ap_batch_id,amount')
+          .in('ap_batch_id', pendingBatches.map((b) => b.id)),
+      ]);
+      apReviewItems = pendingBatches.map((b) => {
+        const c = cases?.find((cs) => cs.id === b.reimbursement_id);
+        const total = (bills ?? []).filter((bl) => bl.ap_batch_id === b.id).reduce((s, bl) => s + bl.amount, 0);
+        return {
+          id: b.id,
+          title: c ? `${c.event_name || 'General Expense'} · ${c.expense_item}` : b.submission_ref,
+          request_number: c?.case_ref ?? b.submission_ref,
+          status: b.manager_submitted_by ? `Submitted by ${b.manager_submitted_by}` : 'Pending Review',
+          total_amount: total,
+          stage: 'AP Batch Review',
+          href: '/reimbursements',
+        };
+      });
+    }
+
+    setItems([...financeItems, ...apReviewItems]);
     setLoading(false);
   }, [profile]);
 
