@@ -256,12 +256,23 @@ export async function createEventFromAgendaItem(
 ) {
   const eventId = String(Date.now());
   const requiredItems = (agenda.data as { requiredItems?: RequiredItem[] } | null)?.requiredItems ?? [];
+  const itemsTotal = requiredItems.reduce((sum, item) => sum + (item.quantity || 0) * (item.amount || 0), 0);
+
+  let plannedBudget = itemsTotal;
+  if (!itemsTotal) {
+    const entered = prompt('No items were listed for this agenda item — enter a planned budget for the event (MVR):');
+    if (entered === null) throw new Error('Event creation cancelled — a planned budget is required.');
+    plannedBudget = Number(entered) || 0;
+    if (plannedBudget <= 0) throw new Error('Enter a planned budget greater than zero.');
+  }
+
   const { error: eventError } = await supabase.from('events').insert({
     id: eventId,
     name: agenda.title,
     description: agenda.details || agenda.discussion || null,
     coordinator: agenda.owner || null,
     status: 'Planning',
+    planned_budget: plannedBudget,
     source_meeting_id: meeting.id,
     source_meeting_title: meeting.title,
     source_meeting_date: meeting.meeting_date,

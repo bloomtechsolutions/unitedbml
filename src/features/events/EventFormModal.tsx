@@ -70,6 +70,10 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
       setFormError('Select a coordinator.');
       return;
     }
+    if (!editing && !(Number(values.planned_budget) > 0)) {
+      setFormError('Enter a planned budget.');
+      return;
+    }
     const coordinator = coordinators.find((c) => c.id === values.coordinator_id);
     setSaving(true);
     setFormError(null);
@@ -160,7 +164,7 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
           </select>
         </div>
         <div className="field">
-          <label>Planned Budget</label>
+          <label>Planned Budget{!editing ? ' *' : ''}</label>
           <input
             type="number"
             min={0}
