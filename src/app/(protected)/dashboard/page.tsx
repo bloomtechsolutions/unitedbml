@@ -135,30 +135,30 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="ub-kpi-row">
-        <Link href="/events" className="ub-card ub-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="ub-kpi-value">{dash.metrics.activeEvents}</div>
-          <div className="ub-kpi-label">Active Events</div>
+      <div className="ub-kpi-strip">
+        <Link href="/events" className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{dash.metrics.activeEvents}</span>
+          <span className="ub-kpi-strip-label">Active Events</span>
         </Link>
-        <Link href="/finance" className="ub-card ub-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="ub-kpi-value">{dash.metrics.pendingApprovals}</div>
-          <div className="ub-kpi-label">Pending Approvals</div>
+        <Link href="/finance" className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{dash.metrics.pendingApprovals}</span>
+          <span className="ub-kpi-strip-label">Pending Approvals</span>
         </Link>
-        <Link href="/events" className="ub-card ub-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="ub-kpi-value">{dash.metrics.openTasks}</div>
-          <div className="ub-kpi-label">Open Tasks</div>
+        <Link href="/events" className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{dash.metrics.openTasks}</span>
+          <span className="ub-kpi-strip-label">Open Tasks</span>
         </Link>
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value">{unreadCount}</div>
-          <div className="ub-kpi-label">Notifications</div>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{unreadCount}</span>
+          <span className="ub-kpi-strip-label">Notifications</span>
         </div>
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value">{dash.metrics.upcoming30}</div>
-          <div className="ub-kpi-label">Next 30 Days</div>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{dash.metrics.upcoming30}</span>
+          <span className="ub-kpi-strip-label">Next 30 Days</span>
         </div>
-        <Link href="/finance" className="ub-card ub-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="ub-kpi-value">{money(dash.metrics.available)}</div>
-          <div className="ub-kpi-label">{dash.metrics.budgetPct.toFixed(0)}% Budget Available</div>
+        <Link href="/finance" className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{money(dash.metrics.available)}</span>
+          <span className="ub-kpi-strip-label">{dash.metrics.budgetPct.toFixed(0)}% Budget Available</span>
         </Link>
       </div>
 
