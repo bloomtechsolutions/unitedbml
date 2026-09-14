@@ -308,6 +308,8 @@
 .ub-table tr:last-child td { border-bottom: 0; }
 .ub-table tr.ub-row-overdue td:first-child { border-left: 3px solid var(--ub-danger); }
 .ub-table tr.ub-row-due td:first-child { border-left: 3px solid var(--ub-warning); }
+.ub-table tbody tr.ub-row-clickable { cursor: pointer; }
+.ub-table tbody tr.ub-row-clickable:hover td { background: var(--ub-surface-2); }
 
 /* Step tracker (approval chains, lifecycle stages) */
 .ub-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }

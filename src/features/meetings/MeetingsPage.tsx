@@ -166,30 +166,34 @@ export function MeetingsPage() {
         )}
       </div>
 
-      <div className="ub-kpi-row">
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value">{kpis.upcoming}</div>
-          <div className="ub-kpi-label">Upcoming</div>
+      <div className="ub-kpi-strip">
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.upcoming}</span>
+          <span className="ub-kpi-strip-label">Upcoming</span>
         </div>
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value">{kpis.thisMonth}</div>
-          <div className="ub-kpi-label">This Month</div>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.thisMonth}</span>
+          <span className="ub-kpi-strip-label">This Month</span>
         </div>
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value">{kpis.openActions}</div>
-          <div className="ub-kpi-label">Open Actions</div>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.openActions}</span>
+          <span className="ub-kpi-strip-label">Open Actions</span>
         </div>
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value" style={{ color: kpis.overdueActions ? 'var(--ub-danger-dark)' : undefined }}>{kpis.overdueActions}</div>
-          <div className="ub-kpi-label">Overdue Actions</div>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value" style={{ color: kpis.overdueActions ? 'var(--ub-danger-dark)' : undefined }}>
+            {kpis.overdueActions}
+          </span>
+          <span className="ub-kpi-strip-label">Overdue Actions</span>
         </div>
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value">{kpis.pendingMinutes}</div>
-          <div className="ub-kpi-label">Minutes Pending</div>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value">{kpis.pendingMinutes}</span>
+          <span className="ub-kpi-strip-label">Minutes Pending</span>
         </div>
-        <div className="ub-card ub-kpi">
-          <div className="ub-kpi-value" style={{ color: kpis.pendingEventCreation ? 'var(--ub-accent-dark)' : undefined }}>{kpis.pendingEventCreation}</div>
-          <div className="ub-kpi-label">Pending Event Creation</div>
+        <div className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value" style={{ color: kpis.pendingEventCreation ? 'var(--ub-accent-dark)' : undefined }}>
+            {kpis.pendingEventCreation}
+          </span>
+          <span className="ub-kpi-strip-label">Pending Event Creation</span>
         </div>
       </div>
 
@@ -227,25 +231,37 @@ export function MeetingsPage() {
               </select>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-            {filtered.map(({ meeting, status }) => (
-              <div
-                key={meeting.id}
-                className="ub-card"
-                style={{ cursor: 'pointer', padding: 20 }}
-                onClick={() => setWorkspaceId(meeting.id)}
-              >
-                <span className={`ub-pill ${STATUS_PILL[status]}`}>{status}</span>
-                <h3 style={{ fontSize: 16.5, fontWeight: 700, margin: '10px 0 8px' }}>{meeting.title}</h3>
-                <div style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', lineHeight: 1.7 }}>
-                  {meeting.meeting_date} · {meeting.meeting_time}
-                  <br />
-                  {meeting.location}
-                </div>
-              </div>
-            ))}
-            {!filtered.length && <div className="ub-empty">No meetings match your filters.</div>}
-          </div>
+          <table className="ub-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Location</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(({ meeting, status }) => (
+                <tr key={meeting.id} className="ub-row-clickable" onClick={() => setWorkspaceId(meeting.id)}>
+                  <td style={{ fontWeight: 700 }}>{meeting.title}</td>
+                  <td>{meeting.meeting_date}</td>
+                  <td>{meeting.meeting_time}</td>
+                  <td>{meeting.location}</td>
+                  <td>
+                    <span className={`ub-pill ${STATUS_PILL[status]}`}>{status}</span>
+                  </td>
+                </tr>
+              ))}
+              {!filtered.length && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--ub-ink-faint)' }}>
+                    No meetings match your filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </>
       )}
 
