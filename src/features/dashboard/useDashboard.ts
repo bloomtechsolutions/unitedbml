@@ -1,17 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Profile } from '../../types/database';
 import { eventLifecycle, localTodayIso } from '../events/lifecycle';
 import { useEvents } from '../events/useEvents';
-import type { EventWithChildren } from '../events/types';
 import { meetingStatus } from '../meetings/status';
 import { useMeetings } from '../meetings/useMeetings';
-import type { MeetingWithChildren } from '../meetings/types';
 import { approvedSpend, availableBudget, useBudget, useExpenseRequests } from '../finance/useFinance';
 import { useStandingAllocationsActual } from '../allocations/useAllocations';
-import type { ExpenseRequestWithLines } from '../finance/types';
 import { useReimbursementCases } from '../reimbursements/useReimbursements';
-
-export type DashboardView = 'Executive' | 'My';
 
 export interface AgendaItem {
   key: string;
@@ -40,29 +35,6 @@ export interface RecentItem {
   href: string;
 }
 
-function isMine(name: string | null | undefined, profile: Profile | null): boolean {
-  if (!name || !profile?.full_name) return false;
-  return name.trim().toLowerCase() === profile.full_name.trim().toLowerCase();
-}
-
-function eventIsMine(event: EventWithChildren, profile: Profile | null): boolean {
-  if (isMine(event.coordinator, profile)) return true;
-  return event.tasks.some((t) => isMine(t.owner, profile));
-}
-
-function meetingIsMine(meeting: MeetingWithChildren, profile: Profile | null): boolean {
-  if (isMine(meeting.chair, profile) || isMine(meeting.secretary, profile)) return true;
-  return meeting.actions.some((a) => isMine(a.assigned_to, profile));
-}
-
-function requestIsMine(request: ExpenseRequestWithLines, profile: Profile | null): boolean {
-  if (!profile) return false;
-  if (request.requested_by_user === profile.id) return true;
-  if (isMine(request.requested_by, profile) || isMine(request.final_approver_name, profile)) return true;
-  if (profile.role === 'President' && request.status === 'Pending President Recommendation') return true;
-  return false;
-}
-
 function relativeDay(iso: string): string {
   const diff = Math.ceil(
     (new Date(`${iso}T23:59:59`).getTime() - new Date(`${localTodayIso()}T00:00:00`).getTime()) / 86400000
@@ -74,59 +46,34 @@ function relativeDay(iso: string): string {
   return iso;
 }
 
-export function useDashboard(profile: Profile | null) {
+export function useDashboard(_profile: Profile | null) {
   const { events, loading: eventsLoading } = useEvents();
   const { meetings, loading: meetingsLoading } = useMeetings();
   const { budget, loading: budgetLoading } = useBudget();
   const { requests, loading: requestsLoading } = useExpenseRequests();
   const { cases: reimbursementCases, batches: apBatches, loading: reimbLoading } = useReimbursementCases();
 
-  const [view, setView] = useState<DashboardView>('Executive');
   const [agendaRange, setAgendaRange] = useState<7 | 30>(7);
 
-  useEffect(() => {
-    const stored = typeof window !== 'undefined' ? window.localStorage.getItem('ub-dashboard-view') : null;
-    if (stored === 'My' || stored === 'Executive') setView(stored);
-  }, []);
-
-  const changeView = (next: DashboardView) => {
-    setView(next);
-    if (typeof window !== 'undefined') window.localStorage.setItem('ub-dashboard-view', next);
-  };
-
   const loading = eventsLoading || meetingsLoading || budgetLoading || requestsLoading || reimbLoading;
-  const my = view === 'My';
   const today = localTodayIso();
 
-  const scopedEvents = useMemo(
-    () => events.filter((e) => (my ? eventIsMine(e, profile) : true)),
-    [events, my, profile]
-  );
-  const scopedMeetings = useMemo(
-    () => meetings.filter((m) => (my ? meetingIsMine(m, profile) : true)),
-    [meetings, my, profile]
-  );
-  const scopedRequests = useMemo(
-    () => requests.filter((r) => (my ? requestIsMine(r, profile) : true)),
-    [requests, my, profile]
-  );
-
   const activeEvents = useMemo(
-    () => scopedEvents.filter((e) => !e.archived && !['Closed', 'Cancelled'].includes(eventLifecycle(e, e.tasks))),
-    [scopedEvents]
+    () => events.filter((e) => !e.archived && !['Closed', 'Cancelled'].includes(eventLifecycle(e, e.tasks))),
+    [events]
   );
 
   const upcomingEvents30 = useMemo(() => {
     const end = new Date(new Date(`${today}T00:00:00`).getTime() + 30 * 86400000).toISOString().slice(0, 10);
-    return scopedEvents.filter((e) => e.event_date && e.event_date >= today && e.event_date <= end);
-  }, [scopedEvents, today]);
+    return events.filter((e) => e.event_date && e.event_date >= today && e.event_date <= end);
+  }, [events, today]);
 
-  const openTasks = useMemo(() => scopedEvents.flatMap((e) => e.tasks.filter((t) => !t.done)), [scopedEvents]);
+  const openTasks = useMemo(() => events.flatMap((e) => e.tasks.filter((t) => !t.done)), [events]);
   const overdueTasks = useMemo(() => openTasks.filter((t) => t.due_date && t.due_date < today), [openTasks, today]);
 
   const pendingRequests = useMemo(
-    () => scopedRequests.filter((r) => r.status === 'Pending President Recommendation' || r.status === 'Pending Final Approval'),
-    [scopedRequests]
+    () => requests.filter((r) => r.status === 'Pending President Recommendation' || r.status === 'Pending Final Approval'),
+    [requests]
   );
 
   const openReimbursements = useMemo(
@@ -147,7 +94,7 @@ export function useDashboard(profile: Profile | null) {
   const agenda = useMemo<AgendaItem[]>(() => {
     const end = new Date(new Date(`${today}T00:00:00`).getTime() + agendaRange * 86400000).toISOString().slice(0, 10);
     const items: AgendaItem[] = [];
-    for (const e of scopedEvents) {
+    for (const e of events) {
       if (e.archived || !e.event_date || e.event_date < today || e.event_date > end) continue;
       items.push({
         key: `event-${e.id}`,
@@ -159,7 +106,7 @@ export function useDashboard(profile: Profile | null) {
         href: `/events`,
       });
     }
-    for (const m of scopedMeetings) {
+    for (const m of meetings) {
       if (m.cancelled || !m.meeting_date || m.meeting_date < today || m.meeting_date > end) continue;
       items.push({
         key: `meeting-${m.id}`,
@@ -172,7 +119,7 @@ export function useDashboard(profile: Profile | null) {
       });
     }
     return items.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 14);
-  }, [scopedEvents, scopedMeetings, agendaRange, today]);
+  }, [events, meetings, agendaRange, today]);
 
   const priorityWork = useMemo<PriorityItem[]>(() => {
     const rows: PriorityItem[] = [];
@@ -216,18 +163,18 @@ export function useDashboard(profile: Profile | null) {
         href: `/reimbursements`,
       });
     }
-    return rows.sort((a, b) => (a.level === b.level ? 0 : a.level === 'danger' ? -1 : 1)).slice(0, my ? 8 : 10);
-  }, [overdueTasks, openTasks, pendingRequests, openReimbursements, my, today]);
+    return rows.sort((a, b) => (a.level === b.level ? 0 : a.level === 'danger' ? -1 : 1)).slice(0, 10);
+  }, [overdueTasks, openTasks, pendingRequests, openReimbursements, today]);
 
   const recentActivity = useMemo<RecentItem[]>(() => {
     const rows: RecentItem[] = [];
-    for (const e of scopedEvents) {
+    for (const e of events) {
       rows.push({ key: `event-${e.id}`, at: e.created_at, title: 'Event created', detail: e.name, href: `/events` });
     }
-    for (const m of scopedMeetings) {
+    for (const m of meetings) {
       rows.push({ key: `meeting-${m.id}`, at: m.created_at, title: 'Meeting scheduled', detail: m.title, href: `/meetings?open=${m.id}` });
     }
-    for (const r of scopedRequests) {
+    for (const r of requests) {
       rows.push({
         key: `req-${r.id}`,
         at: r.submitted_at || r.request_date || '',
@@ -239,20 +186,8 @@ export function useDashboard(profile: Profile | null) {
     return rows
       .filter((r) => r.at)
       .sort((a, b) => b.at.localeCompare(a.at))
-      .slice(0, 8);
-  }, [scopedEvents, scopedMeetings, scopedRequests]);
-
-  const engagement = useMemo(() => {
-    const totalAttendance = scopedEvents.reduce((sum, e) => sum + (e.attendance_count || 0), 0);
-    const allTasks = scopedEvents.flatMap((e) => e.tasks);
-    const completedTasks = allTasks.filter((t) => t.done).length;
-    return {
-      activeEvents: activeEvents.length,
-      totalAttendance,
-      taskCompletionPct: allTasks.length ? Math.round((completedTasks / allTasks.length) * 100) : 0,
-      reimbursementCases: reimbursementCases.length,
-    };
-  }, [scopedEvents, activeEvents, reimbursementCases]);
+      .slice(0, 5);
+  }, [events, meetings, requests]);
 
   const financeSnapshot = useMemo(
     () => ({
@@ -266,20 +201,8 @@ export function useDashboard(profile: Profile | null) {
     [budget, available, spend, pendingRequests, openReimbursements]
   );
 
-  const operationalPulse = useMemo(
-    () => ({
-      activeEvents: activeEvents.length,
-      upcomingMeetings: meetings.filter((m) => !m.cancelled && m.meeting_date && m.meeting_date >= today).length,
-      openReimbursements: openReimbursements.length,
-      overdueTasks: overdueTasks.length,
-    }),
-    [activeEvents, meetings, openReimbursements, overdueTasks, today]
-  );
-
   return {
     loading,
-    view,
-    setView: changeView,
     agendaRange,
     setAgendaRange,
     metrics: {
@@ -293,9 +216,7 @@ export function useDashboard(profile: Profile | null) {
     agenda,
     priorityWork,
     recentActivity,
-    engagement,
     financeSnapshot,
-    operationalPulse,
     meetingStatusOf: meetingStatus,
   };
 }

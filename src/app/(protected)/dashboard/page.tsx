@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth } from '../../../lib/AuthContext';
-import { useToast } from '../../../lib/ToastContext';
 import { useMyMeetings } from '../../../features/dashboard/useMyMeetings';
 import { useDashboard } from '../../../features/dashboard/useDashboard';
 import { markAllNotificationsRead, markNotificationRead, useNotifications } from '../../../features/notifications/useNotifications';
 import { checkInToMeeting } from '../../../features/meetings/useMeetings';
 import { canCheckInToMeeting } from '../../../features/meetings/status';
 import { StaffDashboardPage } from '../../../features/portal/StaffDashboardPage';
+import { useToast } from '../../../lib/ToastContext';
 
 function money(n: number): string {
   return `MVR ${Math.round(n).toLocaleString()}`;
@@ -25,6 +25,15 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function CalendarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="3" />
+      <path d="M8 2v4M16 2v4M3 10h18" />
+    </svg>
+  );
+}
+
 export default function DashboardPage() {
   const { profile, session, isCommitteeUser, committeeChecked } = useAuth();
   if (!committeeChecked) return null;
@@ -35,17 +44,15 @@ export default function DashboardPage() {
 function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<typeof useAuth>['profile']; session: ReturnType<typeof useAuth>['session'] }) {
   const dash = useDashboard(profile);
   const { summaries, myCommitteeId, reload: reloadMeetings } = useMyMeetings(session?.user.id);
-  const { notifications, unreadCount, reload: reloadNotifications } = useNotifications(session?.user.id);
+  const { notifications, reload: reloadNotifications } = useNotifications(session?.user.id);
   const toast = useToast();
 
-  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
 
   const next = summaries[0] ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const isToday = next?.meeting.meeting_date === today;
-  const isMy = dash.view === 'My';
   const checkIn = next ? canCheckInToMeeting(next.meeting) : { allowed: false, reason: null };
 
   const handleCheckIn = async (meetingId: string) => {
@@ -61,60 +68,14 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
     }
   };
 
-  const shownNotifications = unreadOnly ? notifications.filter((n) => !n.is_read) : notifications;
+  const shownNotifications = (unreadOnly ? notifications.filter((n) => !n.is_read) : notifications).slice(0, 5);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
     <div>
       <div className="ub-page-head" style={{ alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ub-ink-faint)', marginBottom: 4 }}>
-            UNITEDBML MANAGEMENT HUB
-          </div>
-          <h1 style={{ fontSize: 26, fontWeight: 700 }}>{isMy ? 'My Dashboard' : 'Executive Dashboard'}</h1>
-          <p>
-            {isMy
-              ? `Welcome${profile?.full_name ? `, ${profile.full_name}` : ''}. Your tasks, notifications, meetings and activity in one place.`
-              : 'A compact view of what needs attention, what is coming next and how UnitedBML is performing.'}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div className="ub-tabs" style={{ margin: 0 }}>
-            <button className={`ub-tab ${!isMy ? 'active' : ''}`} onClick={() => dash.setView('Executive')}>
-              Executive
-            </button>
-            <button className={`ub-tab ${isMy ? 'active' : ''}`} onClick={() => dash.setView('My')}>
-              My Dashboard
-            </button>
-          </div>
-          <div style={{ position: 'relative' }}>
-            <button className="ub-btn ub-btn-primary" onClick={() => setQuickMenuOpen((v) => !v)}>
-              + New
-            </button>
-            {quickMenuOpen && (
-              <>
-                <div style={{ position: 'fixed', inset: 0, zIndex: 30 }} onClick={() => setQuickMenuOpen(false)} />
-                <div className="ub-card" style={{ position: 'absolute', right: 0, top: 44, width: 220, zIndex: 31, padding: 6 }}>
-                  {[
-                    { href: '/events?new=1', label: 'New Event', small: 'Create an activity' },
-                    { href: '/meetings?new=1', label: 'New Meeting', small: 'Schedule committee work' },
-                    { href: '/finance?new=1', label: 'New Expense', small: 'Start finance approval' },
-                    { href: '/reimbursements', label: 'Reimbursement', small: 'Open reimbursement workspace' },
-                  ].map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setQuickMenuOpen(false)}
-                      style={{ display: 'block', padding: '8px 10px', borderRadius: 8, textDecoration: 'none' }}
-                      className="ub-menu-item"
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ub-ink)' }}>{item.label}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)' }}>{item.small}</div>
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          <h1 style={{ fontSize: 26, fontWeight: 700 }}>UnitedBML Management Hub</h1>
         </div>
       </div>
 
@@ -155,17 +116,12 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
           <span className="ub-kpi-strip-value">{dash.metrics.openTasks}</span>
           <span className="ub-kpi-strip-label">Open Tasks</span>
         </Link>
-        <div className="ub-kpi-strip-item">
-          <span className="ub-kpi-strip-value">{unreadCount}</span>
-          <span className="ub-kpi-strip-label">Notifications</span>
-        </div>
-        <div className="ub-kpi-strip-item">
-          <span className="ub-kpi-strip-value">{dash.metrics.upcoming30}</span>
-          <span className="ub-kpi-strip-label">Next 30 Days</span>
-        </div>
-        <Link href="/finance" className="ub-kpi-strip-item">
-          <span className="ub-kpi-strip-value">{money(dash.metrics.available)}</span>
-          <span className="ub-kpi-strip-label">{dash.metrics.budgetPct.toFixed(0)}% Budget Available</span>
+        <Link href="/events?tab=calendar" className="ub-kpi-strip-item">
+          <span className="ub-kpi-strip-value" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <CalendarIcon />
+            {dash.metrics.upcoming30}
+          </span>
+          <span className="ub-kpi-strip-label">Coming Up (30d)</span>
         </Link>
       </div>
 
@@ -228,14 +184,12 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
 
           <div className="ub-card">
             <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700 }}>{isMy ? 'My Priority Work' : 'Priority Work'}</h3>
+              <h3 style={{ fontSize: 15, fontWeight: 700 }}>Priority Work</h3>
               <p style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', marginTop: 2, marginBottom: 14 }}>
-                {isMy ? 'Your tasks, approvals and requests requiring action.' : 'Tasks, approvals and exceptions needing action.'}
+                Tasks, approvals and exceptions needing action.
               </p>
             </div>
-            {!dash.loading && !dash.priorityWork.length && (
-              <p className="ub-empty">{isMy ? 'You have no outstanding priority work.' : 'No high-priority exceptions are currently open.'}</p>
-            )}
+            {!dash.loading && !dash.priorityWork.length && <p className="ub-empty">No high-priority exceptions are currently open.</p>}
             {dash.priorityWork.map((item) => (
               <Link
                 key={item.key}
@@ -260,28 +214,32 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
             ))}
           </div>
 
-          {!isMy && (
-            <div className="ub-card">
-              <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>Engagement &amp; Delivery</h3>
-              <p style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', marginBottom: 14 }}>Compact management indicators across activities and finance.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 14 }}>
-                {[
-                  { label: 'Active activities', value: dash.engagement.activeEvents },
-                  { label: 'Attendance records', value: dash.engagement.totalAttendance },
-                  { label: 'Task completion', value: `${dash.engagement.taskCompletionPct}%` },
-                  { label: 'Reimbursement cases', value: dash.engagement.reimbursementCases },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <div style={{ fontSize: 20, fontWeight: 700 }}>{item.value}</div>
-                    <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 6 }}>{item.label}</div>
-                    <div style={{ height: 5, borderRadius: 99, background: 'var(--ub-surface-2)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: '55%', background: 'var(--ub-accent)' }} />
-                    </div>
-                  </div>
-                ))}
+          <div className="ub-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 700 }}>Finance &amp; Approvals</h3>
+                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Budget position and approval workload.</p>
               </div>
+              <Link href="/finance" className="ub-btn ub-btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }}>
+                Finance →
+              </Link>
             </div>
-          )}
+            <div className="ub-kpi-strip" style={{ margin: 0 }}>
+              {[
+                { label: 'Annual budget', value: money(dash.financeSnapshot.annualBudget) },
+                { label: 'Available', value: money(dash.financeSnapshot.available) },
+                { label: 'Approved spend', value: money(dash.financeSnapshot.approvedSpend) },
+                { label: 'Pending value', value: money(dash.financeSnapshot.pendingValue) },
+                { label: 'Pending requests', value: dash.financeSnapshot.pendingCount },
+                { label: 'Open reimbursements', value: dash.financeSnapshot.openReimbursements },
+              ].map((m) => (
+                <div className="ub-kpi-strip-item" key={m.label}>
+                  <span className="ub-kpi-strip-value">{m.value}</span>
+                  <span className="ub-kpi-strip-label">{m.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -289,7 +247,7 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div>
                 <h3 style={{ fontSize: 15, fontWeight: 700 }}>Notifications</h3>
-                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Updates collected from across the hub.</p>
+                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Last 5 updates from across the hub.</p>
               </div>
               <button
                 className="ub-btn ub-btn-ghost"
@@ -309,7 +267,7 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
               </button>
             )}
             {!shownNotifications.length && <p className="ub-empty">{unreadOnly ? 'All caught up.' : 'No notifications.'}</p>}
-            {shownNotifications.slice(0, 10).map((n) => (
+            {shownNotifications.map((n) => (
               <div
                 key={n.id}
                 onClick={() => void markNotificationRead(n.id).then(reloadNotifications)}
@@ -328,33 +286,9 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
             ))}
           </div>
 
-          {isMy && (
-            <div className="ub-card">
-              <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>My Shortcuts</h3>
-              <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 12 }}>Jump directly to your common work.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { href: '/events', label: 'My Events', small: 'Assigned activities' },
-                  { href: '/meetings', label: 'My Meetings', small: 'Actions & minutes' },
-                  { href: '/reimbursements', label: 'My Requests', small: 'Reimbursement status' },
-                ].map((s) => (
-                  <Link
-                    key={s.href}
-                    href={s.href}
-                    className="ub-card"
-                    style={{ textDecoration: 'none', color: 'inherit', padding: 12 }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{s.label}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)' }}>{s.small}</div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="ub-card">
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>Recent Activity</h3>
-            <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 12 }}>A concise activity stream.</p>
+            <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 12 }}>Last 5 updates across the hub.</p>
             {!dash.loading && !dash.recentActivity.length && <p className="ub-empty">No recent activity.</p>}
             {dash.recentActivity.map((item) => (
               <Link
@@ -374,57 +308,6 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
           </div>
         </div>
       </div>
-
-      {!isMy && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 18 }}>
-          <div className="ub-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div>
-                <h3 style={{ fontSize: 15, fontWeight: 700 }}>Finance &amp; Approvals</h3>
-                <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Budget position and approval workload.</p>
-              </div>
-              <Link href="/finance" className="ub-btn ub-btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }}>
-                Finance →
-              </Link>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
-              {[
-                { label: 'Annual budget', value: money(dash.financeSnapshot.annualBudget) },
-                { label: 'Available', value: money(dash.financeSnapshot.available) },
-                { label: 'Approved spend', value: money(dash.financeSnapshot.approvedSpend) },
-                { label: 'Pending value', value: money(dash.financeSnapshot.pendingValue) },
-                { label: 'Pending requests', value: dash.financeSnapshot.pendingCount },
-                { label: 'Open reimbursements', value: dash.financeSnapshot.openReimbursements },
-              ].map((m) => (
-                <div key={m.label}>
-                  <div style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)' }}>{m.label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{m.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="ub-card">
-            <div style={{ marginBottom: 14 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700 }}>Operational Pulse</h3>
-              <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Events, meetings and reimbursements status.</p>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
-              {[
-                { label: 'Active events', value: dash.operationalPulse.activeEvents },
-                { label: 'Upcoming meetings', value: dash.operationalPulse.upcomingMeetings },
-                { label: 'Open reimbursements', value: dash.operationalPulse.openReimbursements },
-                { label: 'Overdue tasks', value: dash.operationalPulse.overdueTasks },
-              ].map((m) => (
-                <div key={m.label}>
-                  <div style={{ fontSize: 11.5, color: 'var(--ub-ink-faint)' }}>{m.label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{m.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

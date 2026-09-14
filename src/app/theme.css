@@ -400,3 +400,42 @@
   text-align: center; color: var(--ub-ink-faint); padding: 32px; font-size: 14px;
   border: 1px dashed var(--ub-border); border-radius: var(--ub-radius); background: var(--ub-surface);
 }
+
+/* ---------- Event Calendar ---------- */
+.ub-cal-month-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 10px; border: 1px solid var(--ub-border); border-radius: 10px;
+  background: var(--ub-surface); cursor: pointer; min-width: 56px; flex: 1;
+  font-size: 11px; font-weight: 700; color: var(--ub-ink-faint);
+}
+.ub-cal-month-chip:hover { background: var(--ub-surface-2); }
+.ub-cal-month-chip[data-active] { border-color: var(--ub-accent); background: var(--ub-accent-soft); color: var(--ub-accent-dark); }
+.ub-cal-month-bar { display: block; width: 100%; height: 4px; border-radius: 99px; background: var(--ub-surface-2); overflow: hidden; }
+.ub-cal-month-bar span { display: block; height: 100%; background: var(--ub-accent); border-radius: 99px; }
+.ub-cal-month-count { font-size: 10px; color: var(--ub-ink-faint); font-weight: 600; }
+
+.ub-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.ub-cal-weekdays { margin-bottom: 4px; }
+.ub-cal-weekday { text-align: center; font-size: 10.5px; font-weight: 700; color: var(--ub-ink-faint); text-transform: uppercase; padding: 4px 0; }
+
+.ub-cal-cell {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  min-height: 78px; padding: 6px; border-radius: 10px; border: 1px solid var(--ub-border-2);
+  background: var(--ub-surface); cursor: pointer; text-align: left; overflow: hidden;
+}
+.ub-cal-cell:hover { border-color: var(--ub-accent); background: var(--ub-accent-soft); }
+.ub-cal-cell:not([data-in-month]) { opacity: 0.4; }
+.ub-cal-cell[data-today] { border-color: var(--ub-accent); box-shadow: inset 0 0 0 1px var(--ub-accent); }
+.ub-cal-cell[data-selected] { background: var(--ub-accent-soft); border-color: var(--ub-accent); }
+.ub-cal-cell-day { font-size: 12px; font-weight: 700; }
+.ub-cal-cell-chips { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.ub-cal-chip {
+  font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.ub-cal-chip-more { font-size: 10px; color: var(--ub-ink-faint); font-weight: 600; padding: 0 2px; }
+
+@media (max-width: 860px) {
+  .ub-cal-cell { min-height: 56px; }
+  .ub-cal-cell-chips { display: none; }
+}
