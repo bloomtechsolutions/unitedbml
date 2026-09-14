@@ -341,7 +341,10 @@ export async function saveApBatchDraft(
     } satisfies Partial<ApBatchRow>);
     if (error) throw error;
   } else {
-    const { error } = await supabase.from('ap_batches').update({ ap_email: apEmail || null }).eq('id', id);
+    const { error } = await supabase
+      .from('ap_batches')
+      .update({ ap_email: apEmail || null, return_reason: null, returned_by: null, returned_at: null })
+      .eq('id', id);
     if (error) throw error;
   }
 
@@ -500,6 +503,29 @@ export async function sendApBatch(batch: ApBatchWithBills, caseItem: Procurement
 export async function reviewApBatch(batchId: string, reviewerName: string) {
   const { error } = await supabase.rpc('review_ap_batch', { p_batch_id: batchId, p_reviewer_name: reviewerName });
   if (error) throw error;
+}
+
+export async function returnApBatchToManager(batchId: string, reviewerName: string, reason: string) {
+  const { error } = await supabase.rpc('return_ap_batch_to_manager', { p_batch_id: batchId, p_reviewer_name: reviewerName, p_reason: reason });
+  if (error) throw error;
+}
+
+export async function setApBatchEmail(batchId: string, apEmail: string) {
+  const { error } = await supabase.from('ap_batches').update({ ap_email: apEmail }).eq('id', batchId);
+  if (error) throw error;
+}
+
+/** Approve a Manager's pending submission and send it to Accounts Payable in one step. */
+export async function approveAndSendApBatch(
+  batch: ApBatchWithBills,
+  caseItem: ProcurementGroupCase,
+  apEmail: string,
+  attachmentMode: AttachmentMode,
+  actorName: string
+) {
+  await setApBatchEmail(batch.id, apEmail);
+  await reviewApBatch(batch.id, actorName);
+  await sendApBatch({ ...batch, ap_email: apEmail }, caseItem, attachmentMode, actorName);
 }
 
 export async function updateApBatchStatus(batch: ApBatchWithBills, status: string, remarks: string, actorName: string) {

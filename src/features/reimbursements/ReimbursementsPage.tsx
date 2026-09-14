@@ -10,13 +10,13 @@ import { ApStatusModal } from './ApStatusModal';
 import { ExceptionModal } from './ExceptionModal';
 import { ProcurementGroupModal } from './ProcurementGroupModal';
 import { ProcurementResponseModal } from './ProcurementResponseModal';
+import { ReviewApBatchModal } from './ReviewApBatchModal';
 import { VendorFormModal } from './VendorFormModal';
 import { VendorImportModal } from './VendorImportModal';
 import type { ApBatchWithBills, EligibleExpenseLine, EligibleExpenseRequest, ProcurementGroupCase } from './types';
 import {
   apSubmittedTotal,
   deleteVendor,
-  reviewApBatch,
   sendProcurementGroupEmail,
   useEligibleExpenseRequests,
   useReimbursementCases,
@@ -42,7 +42,7 @@ export function ReimbursementsPage() {
   const [subTab, setSubTab] = useState<SubTab>('cases');
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [reviewBatch, setReviewBatch] = useState<ApBatchWithBills | null>(null);
   const [groupTarget, setGroupTarget] = useState<EligibleExpenseRequest | null>(null);
   const [exceptionTarget, setExceptionTarget] = useState<EligibleExpenseLine | null>(null);
   const [respondingGroup, setRespondingGroup] = useState<ProcurementGroupCase | null>(null);
@@ -86,19 +86,6 @@ export function ReimbursementsPage() {
       toast(err instanceof Error ? err.message : 'Failed to send email.');
     } finally {
       setResendingId(null);
-    }
-  };
-
-  const handleReview = async (batchId: string) => {
-    setReviewingId(batchId);
-    try {
-      await reviewApBatch(batchId, profile?.full_name || profile?.email || 'Unknown');
-      toast('Batch approved — it can now be sent to Accounts Payable.');
-      await refresh();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to approve batch.');
-    } finally {
-      setReviewingId(null);
     }
   };
 
@@ -346,9 +333,15 @@ export function ReimbursementsPage() {
                     <span className={`ap-status ${b.status.replace(/[\s/]/g, '')}`}>{b.status}</span>
                     {b.pending_review && (
                       <div style={{ marginTop: 4 }}>
-                        <span className="pill" style={{ background: '#fff4db', color: '#946100' }}>
-                          Pending Review{b.manager_submitted_by ? ` · ${b.manager_submitted_by}` : ''}
-                        </span>
+                        {b.return_reason ? (
+                          <span className="pill" style={{ background: '#fff0f4', color: '#b43554' }}>
+                            Returned to Manager
+                          </span>
+                        ) : (
+                          <span className="pill" style={{ background: '#fff4db', color: '#946100' }}>
+                            Pending Review{b.manager_submitted_by ? ` · ${b.manager_submitted_by}` : ''}
+                          </span>
+                        )}
                       </div>
                     )}
                     {b.status_remarks && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{b.status_remarks}</div>}
@@ -366,8 +359,8 @@ export function ReimbursementsPage() {
                       </button>
                     )}
                     {b.pending_review && (
-                      <button className="btn primary" disabled={reviewingId === b.id} onClick={() => void handleReview(b.id)}>
-                        {reviewingId === b.id ? 'Approving…' : 'Approve for AP'}
+                      <button className="btn primary" onClick={() => setReviewBatch(b)}>
+                        Review
                       </button>
                     )}
                     <button className="btn ghost" onClick={() => setStatusBatch(b)}>
@@ -585,6 +578,12 @@ export function ReimbursementsPage() {
           await refresh();
           toast('AP status updated');
         }}
+      />
+      <ReviewApBatchModal
+        batch={reviewBatch}
+        caseItem={reviewBatch ? lineCases.find((c) => c.id === reviewBatch.reimbursement_id) ?? null : null}
+        onClose={() => setReviewBatch(null)}
+        onDecided={refresh}
       />
       <VendorFormModal
         open={vendorFormOpen}

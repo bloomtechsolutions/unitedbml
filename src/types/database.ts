@@ -514,6 +514,9 @@ export interface ApBatchRow {
   pending_review: boolean;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  return_reason: string | null;
+  returned_by: string | null;
+  returned_at: string | null;
   data: Record<string, unknown>;
   created_at: string;
   updated_at: string;

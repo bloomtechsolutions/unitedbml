@@ -181,11 +181,19 @@ export function StaffDashboardPage() {
                     </div>
                     <span
                       className={`ub-pill ${
-                        b.pending_review ? 'ub-pill-warning' : b.status === 'Paid' ? 'ub-pill-success' : b.status === 'Returned / Query' ? 'ub-pill-danger' : 'ub-pill-neutral'
+                        b.pending_review
+                          ? b.return_reason
+                            ? 'ub-pill-danger'
+                            : 'ub-pill-warning'
+                          : b.status === 'Paid'
+                            ? 'ub-pill-success'
+                            : b.status === 'Returned / Query'
+                              ? 'ub-pill-danger'
+                              : 'ub-pill-neutral'
                       }`}
                       style={{ whiteSpace: 'nowrap' }}
                     >
-                      {b.pending_review ? 'Pending Review' : b.status}
+                      {b.pending_review ? (b.return_reason ? 'Returned — Needs Changes' : 'Pending Review') : b.status}
                     </span>
                   </Link>
                 );

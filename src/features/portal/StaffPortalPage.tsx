@@ -32,7 +32,11 @@ function CaseRow({
 
   if (batch) {
     openBatch = batch;
-    if (batch.pending_review) {
+    if (batch.pending_review && batch.return_reason) {
+      statusLabel = 'Returned — Needs Changes';
+      pillClass = 'ub-pill-danger';
+      actionLabel = 'Edit & Resubmit';
+    } else if (batch.pending_review) {
       statusLabel = 'Pending Committee Review';
       pillClass = 'ub-pill-warning';
       actionLabel = 'Edit Submission';
@@ -119,6 +123,11 @@ function CaseRow({
             </span>
           </div>
 
+          {batch?.pending_review && batch.return_reason && (
+            <div className="ub-banner ub-banner-warning" style={{ marginBottom: 10 }}>
+              Returned by {batch.returned_by || 'the committee'}: {batch.return_reason}
+            </div>
+          )}
           {batch?.status_remarks && (
             <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 10 }}>Committee remarks: {batch.status_remarks}</div>
           )}
