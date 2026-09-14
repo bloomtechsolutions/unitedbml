@@ -168,6 +168,12 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     description: 'Per-meeting, per-attendee check-in and absence records.',
     category: 'Meetings & Engagement',
   },
+  {
+    id: 'standing-allocations',
+    title: 'Standing Allocations Report',
+    description: 'Pre-approved off-book activities (Fun with Team, UBML Allowance, Women\'s/Men\'s Day, Year End Activities) — allocated vs. actual spend reported monthly by Finance.',
+    category: 'Finance & Budget',
+  },
 ];
 
 export const REPORT_CATEGORIES: ReportCategory[] = [

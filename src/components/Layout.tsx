@@ -85,6 +85,7 @@ const NAV_AREAS: NavArea[] = [
     subItems: [
       { to: '/finance', label: 'Requests & Budget' },
       { to: '/reimbursements', label: 'Reimbursements' },
+      { to: '/allocations', label: 'Standing Allocations' },
     ],
   },
   {

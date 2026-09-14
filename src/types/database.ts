@@ -921,6 +921,44 @@ export interface Database {
         Update: Partial<ExternalReimbursementHistoryRow>;
       };
       notifications: { Row: NotificationRow; Insert: Partial<NotificationRow>; Update: Partial<NotificationRow> };
+      standing_allocations: {
+        Row: StandingAllocationRow;
+        Insert: Partial<StandingAllocationRow>;
+        Update: Partial<StandingAllocationRow>;
+      };
+      standing_allocation_entries: {
+        Row: StandingAllocationEntryRow;
+        Insert: Partial<StandingAllocationEntryRow>;
+        Update: Partial<StandingAllocationEntryRow>;
+      };
     };
   };
+}
+
+export type AllocationCadence = 'Monthly' | 'Annual';
+
+export interface StandingAllocationRow {
+  id: string;
+  name: string;
+  cadence: AllocationCadence;
+  budget_year: number;
+  allocated_amount: number;
+  notes: string | null;
+  active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StandingAllocationEntryRow {
+  id: string;
+  allocation_id: string;
+  period_year: number;
+  period_month: number;
+  actual_amount: number;
+  description: string | null;
+  source_reference: string | null;
+  recorded_by: string | null;
+  recorded_by_name: string | null;
+  created_at: string;
 }

@@ -140,6 +140,46 @@ export async function budgetUtilization(): Promise<ReportResult> {
   };
 }
 
+export async function standingAllocationsReport(): Promise<ReportResult> {
+  const [allocations, entries] = await Promise.all([
+    all<{ id: string; name: string; cadence: string; budget_year: number; allocated_amount: number; active: boolean }>(
+      'standing_allocations'
+    ),
+    all<{ allocation_id: string; period_year: number; period_month: number; actual_amount: number }>(
+      'standing_allocation_entries'
+    ),
+  ]);
+  return {
+    columns: [
+      col('name', 'Activity', text),
+      col('cadence', 'Cadence', text),
+      col('budget_year', 'Year', text),
+      col('allocated_amount', 'Allocated', money),
+      col('actual_amount', 'Actual (Year)', money),
+      col('remaining', 'Remaining', money),
+      col('active', 'Active', text),
+    ],
+    rows: allocations.map((a) => {
+      const actual = entries
+        .filter((e) => e.allocation_id === a.id && e.period_year === a.budget_year)
+        .reduce((s, e) => s + (e.actual_amount || 0), 0);
+      return {
+        name: a.name,
+        cadence: a.cadence,
+        budget_year: a.budget_year,
+        allocated_amount: a.cadence === 'Annual' ? a.allocated_amount : null,
+        actual_amount: actual,
+        remaining: a.cadence === 'Annual' ? a.allocated_amount - actual : null,
+        active: a.active ? 'Yes' : 'No',
+        _date: null,
+        _eventId: null,
+        _eventName: null,
+        _status: a.active ? 'Active' : 'Inactive',
+      };
+    }),
+  };
+}
+
 export async function eventBudgetActual(): Promise<ReportResult> {
   const events = await all<Record<string, unknown>>('events');
   return {
@@ -776,6 +816,8 @@ export async function runReport(id: string, month: string): Promise<ReportResult
       return leaderboardStandings();
     case 'meeting-attendance-detail':
       return meetingAttendanceDetail();
+    case 'standing-allocations':
+      return standingAllocationsReport();
     default:
       return { columns: [], rows: [] };
   }
