@@ -138,6 +138,36 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     description: 'Single-month management rollup: events, attendance, expenses, approvals, reimbursements.',
     category: 'Executive Reports',
   },
+  {
+    id: 'contingency-register',
+    title: 'Contingency Requests Register',
+    description: 'Every contingency request with amount, status, and who approved or rejected it.',
+    category: 'Finance & Budget',
+  },
+  {
+    id: 'reimbursement-manager-assignments',
+    title: 'Reimbursement Manager Assignments',
+    description: 'Which events have a Reimbursement Manager assigned, who they are, and their submission activity.',
+    category: 'Reimbursements & AP',
+  },
+  {
+    id: 'event-winners',
+    title: 'Achievements / Event Winners Report',
+    description: 'Results and winners recorded per event tournament.',
+    category: 'Events & Attendance',
+  },
+  {
+    id: 'leaderboard-standings',
+    title: 'Leaderboard Standings',
+    description: 'Point-in-time export of committee member rankings by points, events, tasks and achievements.',
+    category: 'Governance & Committee',
+  },
+  {
+    id: 'meeting-attendance-detail',
+    title: 'Meeting Attendance Detail',
+    description: 'Per-meeting, per-attendee check-in and absence records.',
+    category: 'Meetings & Engagement',
+  },
 ];
 
 export const REPORT_CATEGORIES: ReportCategory[] = [

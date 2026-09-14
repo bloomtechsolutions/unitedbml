@@ -1,4 +1,6 @@
 import { supabase } from '../../lib/supabase';
+import { computeLeaderboard } from '../leaderboard/compute';
+import type { EventAttendanceRow, EventRow, EventTaskRow, StaffRow, TournamentWinnerRow } from '../../types/database';
 import type { ReportColumn, ReportResult, ReportRow } from './types';
 
 async function all<T>(table: string, select = '*'): Promise<T[]> {
@@ -218,7 +220,84 @@ export async function monthlyExpense(): Promise<ReportResult> {
   };
 }
 
+export async function contingencyRegister(): Promise<ReportResult> {
+  const requests = await all<Record<string, unknown>>('contingency_requests');
+  return {
+    columns: [
+      col('ref', 'Ref', text),
+      col('event_name', 'Event', text),
+      col('expense_item', 'Expense Item', text),
+      col('requested_amount', 'Requested', money),
+      col('status', 'Status', status),
+      col('requested_by_name', 'Requested By', text),
+      col('president_by', 'President', text),
+      col('procurement_response_by', 'Procurement', text),
+      col('requested_at', 'Date', date),
+    ],
+    rows: requests.map((r) => ({
+      ...r,
+      requested_at: (r.requested_at as string)?.slice(0, 10) ?? null,
+      _date: (r.requested_at as string)?.slice(0, 10) ?? null,
+      _eventId: (r.event_id as string) ?? null,
+      _eventName: (r.event_name as string) ?? null,
+      _status: (r.status as string) ?? null,
+    })),
+  };
+}
+
 // ---------- Reimbursements & AP ----------
+
+export async function reimbursementManagerAssignments(): Promise<ReportResult> {
+  const [events, cases, batches, bills] = await Promise.all([
+    all<Record<string, unknown>>('events'),
+    all<{ id: string; event_id: string | null }>('reimbursement_cases'),
+    all<{ id: string; reimbursement_id: string; status: string; pending_review: boolean }>('ap_batches'),
+    all<{ ap_batch_id: string; amount: number }>('ap_bills'),
+  ]);
+  const assigned = events.filter((e) => e.reimbursement_manager_user_id);
+
+  const caseIdsByEvent = new Map<string, string[]>();
+  for (const c of cases) {
+    if (!c.event_id) continue;
+    const arr = caseIdsByEvent.get(c.event_id) ?? [];
+    arr.push(c.id);
+    caseIdsByEvent.set(c.event_id, arr);
+  }
+  const billTotalByBatch = new Map<string, number>();
+  for (const b of bills) {
+    billTotalByBatch.set(b.ap_batch_id, (billTotalByBatch.get(b.ap_batch_id) ?? 0) + (b.amount || 0));
+  }
+
+  return {
+    columns: [
+      col('name', 'Event', text),
+      col('event_scope', 'Scope', text),
+      col('reimbursement_manager', 'Manager', text),
+      col('reimbursement_manager_role', 'Role', text),
+      col('submissions', 'Submissions', num),
+      col('pending_review', 'Pending Review', num),
+      col('total_submitted', 'Total Submitted', money),
+    ],
+    rows: assigned.map((e) => {
+      const caseIds = caseIdsByEvent.get(e.id as string) ?? [];
+      const eventBatches = batches.filter((b) => caseIds.includes(b.reimbursement_id) && b.status !== 'Cancelled');
+      const total = eventBatches.reduce((s, b) => s + (billTotalByBatch.get(b.id) ?? 0), 0);
+      return {
+        name: e.name,
+        event_scope: e.event_scope ?? 'Internal',
+        reimbursement_manager: e.reimbursement_manager,
+        reimbursement_manager_role: e.reimbursement_manager_role,
+        submissions: eventBatches.length,
+        pending_review: eventBatches.filter((b) => b.pending_review).length,
+        total_submitted: total,
+        _date: (e.event_date as string) ?? null,
+        _eventId: e.id as string,
+        _eventName: e.name as string,
+        _status: null,
+      };
+    }),
+  };
+}
 
 export async function reimbursementMaster(): Promise<ReportResult> {
   const [cases, batches, bills] = await Promise.all([
@@ -423,6 +502,41 @@ export async function attendanceSummary(): Promise<ReportResult> {
   };
 }
 
+export async function eventWinnersReport(): Promise<ReportResult> {
+  const [winners, tournaments, events] = await Promise.all([
+    all<Record<string, unknown>>('tournament_winners'),
+    all<{ id: string; event_id: string }>('tournaments'),
+    all<{ id: string; name: string; event_date: string | null }>('events'),
+  ]);
+  const tournamentById = new Map(tournaments.map((t) => [t.id, t] as const));
+  const eventById = new Map(events.map((e) => [e.id, e] as const));
+  return {
+    columns: [
+      col('event_name', 'Event', text),
+      col('position', 'Result', text),
+      col('winner_name', 'Winner', text),
+      col('remarks', 'Remarks', text),
+      col('recorded_at', 'Recorded', date),
+    ],
+    rows: winners.map((w) => {
+      const tournament = tournamentById.get(w.tournament_id as string);
+      const ev = tournament ? eventById.get(tournament.event_id) : undefined;
+      const recordedAt = (w.created_at as string)?.slice(0, 10) ?? null;
+      return {
+        event_name: ev?.name ?? '',
+        position: w.position,
+        winner_name: w.winner_name,
+        remarks: w.remarks ?? '',
+        recorded_at: recordedAt,
+        _date: recordedAt ?? ev?.event_date ?? null,
+        _eventId: ev?.id ?? null,
+        _eventName: ev?.name ?? null,
+        _status: null,
+      };
+    }),
+  };
+}
+
 // ---------- Governance & Committee ----------
 
 export async function committeeDirectory(): Promise<ReportResult> {
@@ -446,7 +560,75 @@ export async function committeeDirectory(): Promise<ReportResult> {
   };
 }
 
+export async function leaderboardStandings(): Promise<ReportResult> {
+  const [events, attendance, tasks, winners, staff] = await Promise.all([
+    all<EventRow>('events'),
+    all<EventAttendanceRow>('event_attendance'),
+    all<EventTaskRow>('event_tasks'),
+    all<TournamentWinnerRow>('tournament_winners'),
+    all<StaffRow>('staff'),
+  ]);
+  const rows = computeLeaderboard({ events, attendance, tasks, winners, staff }).sort(
+    (a, b) => b.points - a.points || a.name.localeCompare(b.name)
+  );
+  return {
+    columns: [
+      col('rank', 'Rank', num),
+      col('name', 'Name', text),
+      col('department', 'Department', text),
+      col('points', 'Points', num),
+      col('events', 'Events Attended', num),
+      col('tasks', 'Tasks Completed', num),
+      col('wins', 'Achievements', num),
+    ],
+    rows: rows.map((r, i) => ({
+      rank: i + 1,
+      name: r.name,
+      department: r.department ?? '',
+      points: r.points,
+      events: r.events,
+      tasks: r.tasks,
+      wins: r.wins,
+      _date: null,
+      _eventId: null,
+      _eventName: null,
+      _status: null,
+    })),
+  };
+}
+
 // ---------- Meetings & Engagement ----------
+
+export async function meetingAttendanceDetail(): Promise<ReportResult> {
+  const [attendees, meetings] = await Promise.all([
+    all<Record<string, unknown>>('meeting_attendees'),
+    all<{ id: string; title: string; meeting_date: string | null }>('meetings'),
+  ]);
+  const meetingById = new Map(meetings.map((m) => [m.id, m] as const));
+  return {
+    columns: [
+      col('meeting_title', 'Meeting', text),
+      col('meeting_date', 'Date', date),
+      col('attendee_name', 'Attendee', text),
+      col('attendee_role', 'Role', text),
+      col('attendance_status', 'Status', status),
+    ],
+    rows: attendees.map((a) => {
+      const m = meetingById.get(a.meeting_id as string);
+      return {
+        meeting_title: m?.title ?? '',
+        meeting_date: m?.meeting_date ?? null,
+        attendee_name: a.attendee_name,
+        attendee_role: a.attendee_role ?? '',
+        attendance_status: (a.attendance_status as string) ?? 'Pending',
+        _date: m?.meeting_date ?? null,
+        _eventId: null,
+        _eventName: null,
+        _status: (a.attendance_status as string) ?? null,
+      };
+    }),
+  };
+}
 
 export async function pendingActions(): Promise<ReportResult> {
   const [actions, meetings] = await Promise.all([
@@ -586,6 +768,16 @@ export async function runReport(id: string, month: string): Promise<ReportResult
       return emailStatus();
     case 'monthly-executive':
       return monthlyExecutive(month);
+    case 'contingency-register':
+      return contingencyRegister();
+    case 'reimbursement-manager-assignments':
+      return reimbursementManagerAssignments();
+    case 'event-winners':
+      return eventWinnersReport();
+    case 'leaderboard-standings':
+      return leaderboardStandings();
+    case 'meeting-attendance-detail':
+      return meetingAttendanceDetail();
     default:
       return { columns: [], rows: [] };
   }
