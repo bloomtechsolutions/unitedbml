@@ -19,6 +19,8 @@ interface Props {
   annualBudget: number;
   approvedSpendTotal: number;
   available: number;
+  standingAllocationsActual: number;
+  standingAllocationsThisMonth: number;
   requests: ExpenseRequestWithLines[];
   pendingCount: number;
   pendingSettlementCount: number;
@@ -35,6 +37,8 @@ export function FinanceDashboardTab({
   annualBudget,
   approvedSpendTotal,
   available,
+  standingAllocationsActual,
+  standingAllocationsThisMonth,
   requests,
   pendingCount,
   pendingSettlementCount,
@@ -65,14 +69,15 @@ export function FinanceDashboardTab({
 
   const thisMonthTotal = useMemo(() => {
     const month = new Date().toISOString().slice(0, 7);
-    return requests
+    const requestsThisMonth = requests
       .filter((r) => r.status === 'Approved' && (r.request_date || '').startsWith(month))
       .reduce((s, r) => s + (r.total_amount || 0), 0);
-  }, [requests]);
+    return requestsThisMonth + standingAllocationsThisMonth;
+  }, [requests, standingAllocationsThisMonth]);
 
   const byMode: Record<BudgetMode, { label: string; value: number }> = {
     approved: { label: 'Approved Spend', value: approvedSpendTotal },
-    actual: { label: 'Actual Expense', value: eventTotals.actual },
+    actual: { label: 'Actual Expense', value: eventTotals.actual + standingAllocationsActual },
     planned: { label: 'Planned Budget', value: eventTotals.planned },
   };
   const primaryValue = byMode[mode].value;
@@ -170,6 +175,10 @@ export function FinanceDashboardTab({
           <div className="mini">
             <small>Pending Settlements</small>
             <strong>{pendingSettlementCount}</strong>
+          </div>
+          <div className="mini">
+            <small>Standing Allocations (YTD)</small>
+            <strong>MVR {standingAllocationsActual.toLocaleString()}</strong>
           </div>
         </div>
       </div>

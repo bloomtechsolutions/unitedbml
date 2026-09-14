@@ -73,8 +73,12 @@ export function approvedSpend(requests: ExpenseRequestWithLines[]): number {
   return requests.filter((r) => r.status === 'Approved').reduce((sum, r) => sum + (r.total_amount || 0), 0);
 }
 
-export function availableBudget(budget: BudgetRow | null, requests: ExpenseRequestWithLines[]): number {
-  return (budget?.approved_amount ?? 0) - approvedSpend(requests);
+export function availableBudget(
+  budget: BudgetRow | null,
+  requests: ExpenseRequestWithLines[],
+  extraCommitted = 0
+): number {
+  return (budget?.approved_amount ?? 0) - approvedSpend(requests) - extraCommitted;
 }
 
 export function getEventApprovedBudget(requests: ExpenseRequestWithLines[], eventId: string): number {

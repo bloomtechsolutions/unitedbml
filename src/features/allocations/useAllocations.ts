@@ -115,6 +115,39 @@ export async function deleteAllocationEntry(id: string) {
   if (error) throw error;
 }
 
+export function useStandingAllocationsActual(year: number) {
+  const [total, setTotal] = useState(0);
+  const [thisMonthTotal, setThisMonthTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    supabase
+      .from('standing_allocation_entries')
+      .select('actual_amount,period_month')
+      .eq('period_year', year)
+      .then(({ data }) => {
+        if (!active) return;
+        const rows = data ?? [];
+        const now = new Date();
+        const isCurrentYear = year === now.getFullYear();
+        setTotal(rows.reduce((s, r) => s + (r.actual_amount || 0), 0));
+        setThisMonthTotal(
+          isCurrentYear
+            ? rows.filter((r) => r.period_month === now.getMonth() + 1).reduce((s, r) => s + (r.actual_amount || 0), 0)
+            : 0
+        );
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [year]);
+
+  return { total, thisMonthTotal, loading };
+}
+
 export function actualTotal(entries: StandingAllocationEntryRow[], allocationId: string, year?: number): number {
   return entries
     .filter((e) => e.allocation_id === allocationId && (year === undefined || e.period_year === year))

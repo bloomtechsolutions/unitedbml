@@ -7,6 +7,7 @@ import { meetingStatus } from '../meetings/status';
 import { useMeetings } from '../meetings/useMeetings';
 import type { MeetingWithChildren } from '../meetings/types';
 import { approvedSpend, availableBudget, useBudget, useExpenseRequests } from '../finance/useFinance';
+import { useStandingAllocationsActual } from '../allocations/useAllocations';
 import type { ExpenseRequestWithLines } from '../finance/types';
 import { useReimbursementCases } from '../reimbursements/useReimbursements';
 
@@ -139,7 +140,8 @@ export function useDashboard(profile: Profile | null) {
   );
 
   const spend = approvedSpend(requests);
-  const available = availableBudget(budget, requests);
+  const { total: standingAllocationsActual } = useStandingAllocationsActual(new Date().getFullYear());
+  const available = availableBudget(budget, requests, standingAllocationsActual);
   const budgetPct = budget?.approved_amount ? Math.max(0, Math.min(100, (available / budget.approved_amount) * 100)) : 0;
 
   const agenda = useMemo<AgendaItem[]>(() => {

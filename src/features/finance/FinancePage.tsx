@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
+import { useStandingAllocationsActual } from '../allocations/useAllocations';
 import { ContingencyPanel } from '../settlements/ContingencyPanel';
 import { SettlementModal } from '../settlements/SettlementModal';
 import { settlementKeyForRequest, useSettlementRegister } from '../settlements/useSettlements';
@@ -48,6 +49,8 @@ export function FinancePage() {
   const [budgetModalOpen, setBudgetModalOpen] = useState(false);
   const searchParams = useSearchParams();
   const { rows: settlementRows, loading: settlementsLoading, reload: reloadSettlements } = useSettlementRegister();
+  const { total: standingAllocationsActual, thisMonthTotal: standingAllocationsThisMonth } =
+    useStandingAllocationsActual(new Date().getFullYear());
 
   useEffect(() => {
     if (searchParams.get('new') === '1') setFormOpen(true);
@@ -55,7 +58,7 @@ export function FinancePage() {
   }, []);
 
   const spend = approvedSpend(requests);
-  const available = availableBudget(budget, requests);
+  const available = availableBudget(budget, requests, standingAllocationsActual);
   const pending = requests.filter(
     (r) => r.status === 'Pending President Recommendation' || r.status === 'Pending Final Approval'
   );
@@ -156,6 +159,8 @@ export function FinancePage() {
           annualBudget={budget?.approved_amount ?? 0}
           approvedSpendTotal={spend}
           available={available}
+          standingAllocationsActual={standingAllocationsActual}
+          standingAllocationsThisMonth={standingAllocationsThisMonth}
           requests={requests}
           pendingCount={pending.length}
           pendingSettlementCount={pendingSettlementCount}

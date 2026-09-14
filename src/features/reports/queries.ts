@@ -111,12 +111,17 @@ export async function approvalStatus(): Promise<ReportResult> {
 
 export async function budgetUtilization(): Promise<ReportResult> {
   const year = new Date().getFullYear();
-  const [{ data: budget }, requests] = await Promise.all([
+  const [{ data: budget }, requests, allocationEntries] = await Promise.all([
     supabase.from('budgets').select('*').eq('budget_year', year).maybeSingle(),
     all<{ status: string; total_amount: number }>('expense_requests'),
+    all<{ period_year: number; actual_amount: number }>('standing_allocation_entries'),
   ]);
   const approved = requests.filter((r) => r.status === 'Approved').reduce((s, r) => s + (r.total_amount || 0), 0);
+  const standingAllocationsActual = allocationEntries
+    .filter((e) => e.period_year === year)
+    .reduce((s, e) => s + (e.actual_amount || 0), 0);
   const annual = budget?.approved_amount ?? 0;
+  const committed = approved + standingAllocationsActual;
   const row: ReportRow = {
     _date: null,
     _eventId: null,
@@ -125,14 +130,16 @@ export async function budgetUtilization(): Promise<ReportResult> {
     budget_year: year,
     annual_budget: annual,
     approved_spend: approved,
-    available_budget: annual - approved,
-    utilization_pct: annual ? Math.round((approved / annual) * 1000) / 10 : 0,
+    standing_allocations_actual: standingAllocationsActual,
+    available_budget: annual - committed,
+    utilization_pct: annual ? Math.round((committed / annual) * 1000) / 10 : 0,
   };
   return {
     columns: [
       col('budget_year', 'Year', text),
       col('annual_budget', 'Annual Budget', money),
       col('approved_spend', 'Approved Spend', money),
+      col('standing_allocations_actual', 'Standing Allocations', money),
       col('available_budget', 'Available', money),
       col('utilization_pct', 'Utilization %', num),
     ],

@@ -46,7 +46,7 @@ button,input,select,textarea{font:inherit}
 .detail-panel{display:none}.detail-panel.active{display:block}
 .task{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:9px}.task-left{display:flex;gap:10px;align-items:center}.check{width:19px;height:19px}
 .attendance-bar{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;margin-bottom:9px}
-.mini-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}.mini{background:#f8f9fc;border-radius:12px;padding:12px}.mini strong{display:block;font-size:20px}
+.mini-stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}.mini{background:#f8f9fc;border-radius:12px;padding:12px}.mini strong{display:block;font-size:20px}
 .toast{position:fixed;right:22px;bottom:22px;background:#182033;color:#fff;padding:12px 16px;border-radius:12px;display:none;z-index:100;box-shadow:var(--shadow)}
 
 .committee-hero{background:linear-gradient(135deg,#172033,#313b57);color:#fff;border-radius:20px;padding:22px;display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:18px;box-shadow:var(--shadow)}
