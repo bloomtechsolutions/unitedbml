@@ -4,11 +4,21 @@ import { useState } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { ApBatchModal } from '../reimbursements/ApBatchModal';
+import { apCommittedTotal } from '../reimbursements/useReimbursements';
 import type { ApBatchWithBills, ProcurementGroupCase } from '../reimbursements/types';
-import { latestBatchForCase, managerSubmittedTotal, useStaffReimbursementWorkspace, type ManagedEventSummary } from './useStaffReimbursements';
+import { batchesForCase, draftBatchForCase, useStaffReimbursementWorkspace, type ManagedEventSummary } from './useStaffReimbursements';
 
 function money(n: number): string {
   return `MVR ${Math.round(n).toLocaleString()}`;
+}
+
+function batchStatusInfo(batch: ApBatchWithBills): { label: string; pillClass: string } {
+  if (batch.pending_review && batch.return_reason) return { label: 'Returned — Needs Changes', pillClass: 'ub-pill-danger' };
+  if (batch.pending_review) return { label: 'Pending Committee Review', pillClass: 'ub-pill-warning' };
+  if (batch.status === 'Draft') return { label: 'Reviewed — Awaiting AP', pillClass: 'ub-pill-success' };
+  if (batch.status === 'Paid') return { label: 'Paid', pillClass: 'ub-pill-success' };
+  if (batch.status === 'Returned / Query') return { label: batch.status, pillClass: 'ub-pill-danger' };
+  return { label: batch.status, pillClass: 'ub-pill-neutral' };
 }
 
 function CaseRow({
@@ -21,34 +31,24 @@ function CaseRow({
   onOpen: (c: ProcurementGroupCase, b: ApBatchWithBills | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const submitted = managerSubmittedTotal(batches, caseItem.id);
+  const submitted = apCommittedTotal(batches, caseItem.id);
   const remaining = caseItem.approved_item_amount - submitted;
-  const batch = latestBatchForCase(batches, caseItem.id);
+  const history = batchesForCase(batches, caseItem.id);
+  // A case can be submitted more than once as balance allows — but only one open (Draft) batch
+  // can exist at a time, since that's the one actually holding up the remaining balance.
+  const draft = draftBatchForCase(batches, caseItem.id);
 
   let statusLabel = 'Ready to submit';
   let pillClass = 'ub-pill-neutral';
   let actionLabel: string | null = 'Submit Bill';
   let openBatch: ApBatchWithBills | null = null;
 
-  if (batch) {
-    openBatch = batch;
-    if (batch.pending_review && batch.return_reason) {
-      statusLabel = 'Returned — Needs Changes';
-      pillClass = 'ub-pill-danger';
-      actionLabel = 'Edit & Resubmit';
-    } else if (batch.pending_review) {
-      statusLabel = 'Pending Committee Review';
-      pillClass = 'ub-pill-warning';
-      actionLabel = 'Edit Submission';
-    } else if (batch.status === 'Draft') {
-      statusLabel = 'Reviewed — Awaiting AP';
-      pillClass = 'ub-pill-success';
-      actionLabel = 'View';
-    } else {
-      statusLabel = batch.status;
-      pillClass = batch.status === 'Paid' ? 'ub-pill-success' : batch.status === 'Returned / Query' ? 'ub-pill-danger' : 'ub-pill-neutral';
-      actionLabel = 'View';
-    }
+  if (draft) {
+    openBatch = draft;
+    const info = batchStatusInfo(draft);
+    statusLabel = info.label;
+    pillClass = info.pillClass;
+    actionLabel = draft.pending_review ? (draft.return_reason ? 'Edit & Resubmit' : 'Edit Submission') : 'View';
   } else if (remaining <= 0.01) {
     statusLabel = 'Fully submitted';
     pillClass = 'ub-pill-success';
@@ -76,6 +76,7 @@ function CaseRow({
             <div style={{ fontSize: 13.5, fontWeight: 700 }}>{caseItem.expense_item}</div>
             <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>
               Approved {money(caseItem.approved_item_amount)} · Submitted {money(submitted)} · Balance {money(remaining)}
+              {history.length > 1 ? ` · ${history.length} submissions` : ''}
             </div>
           </div>
         </div>
@@ -123,43 +124,57 @@ function CaseRow({
             </span>
           </div>
 
-          {batch?.pending_review && batch.return_reason && (
-            <div className="ub-banner ub-banner-warning" style={{ marginBottom: 10 }}>
-              Returned by {batch.returned_by || 'the committee'}: {batch.return_reason}
-            </div>
-          )}
-          {batch?.status_remarks && (
-            <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 10 }}>Committee remarks: {batch.status_remarks}</div>
-          )}
+          {!history.length && <p className="ub-empty" style={{ padding: '14px 0' }}>No bills submitted yet.</p>}
 
-          {!batch?.bills.length && <p className="ub-empty" style={{ padding: '14px 0' }}>No bills submitted yet.</p>}
+          {history.map((batch, i) => {
+            const info = batchStatusInfo(batch);
+            return (
+              <div key={batch.id} style={{ marginBottom: i < history.length - 1 ? 14 : 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ub-ink-faint)' }}>
+                    Submission {history.length - i} · {batch.submission_ref}
+                  </div>
+                  <span className={`ub-pill ${info.pillClass}`} style={{ fontSize: 11 }}>
+                    {info.label}
+                  </span>
+                </div>
 
-          {!!batch?.bills.length && (
-            <table className="ub-table" style={{ fontSize: 12.5 }}>
-              <thead>
-                <tr>
-                  <th>Bill Date</th>
-                  <th>Vendor</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batch.bills.map((bill) => (
-                  <tr key={bill.id}>
-                    <td>{bill.bill_date || '—'}</td>
-                    <td>{bill.vendor_name || '—'}</td>
-                    <td>{money(bill.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ fontWeight: 700 }}>
-                  <td colSpan={2}>Total</td>
-                  <td>{money(batch.bills.reduce((s, b) => s + b.amount, 0))}</td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
+                {batch.pending_review && batch.return_reason && (
+                  <div className="ub-banner ub-banner-warning" style={{ marginBottom: 8 }}>
+                    Returned by {batch.returned_by || 'the committee'}: {batch.return_reason}
+                  </div>
+                )}
+                {batch.status_remarks && (
+                  <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 8 }}>Committee remarks: {batch.status_remarks}</div>
+                )}
+
+                <table className="ub-table" style={{ fontSize: 12.5 }}>
+                  <thead>
+                    <tr>
+                      <th>Bill Date</th>
+                      <th>Vendor</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batch.bills.map((bill) => (
+                      <tr key={bill.id}>
+                        <td>{bill.bill_date || '—'}</td>
+                        <td>{bill.vendor_name || '—'}</td>
+                        <td>{money(bill.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ fontWeight: 700 }}>
+                      <td colSpan={2}>Total</td>
+                      <td>{money(batch.bills.reduce((s, b) => s + b.amount, 0))}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

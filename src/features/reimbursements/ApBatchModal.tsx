@@ -7,7 +7,7 @@ import { useAuth } from '../../lib/AuthContext';
 import type { ApBillRow, VendorMasterRow } from '../../types/database';
 import { ATTACHMENT_MODES } from './types';
 import type { ApBatchWithBills, AttachmentMode, ProcurementGroupCase } from './types';
-import { apSubmittedTotal, saveApBatchDraft, sendApBatch, uploadBatchAttachment, useVendorSearch } from './useReimbursements';
+import { apCommittedTotal, saveApBatchDraft, sendApBatch, uploadBatchAttachment, useVendorSearch } from './useReimbursements';
 
 type DraftBill = Omit<ApBillRow, 'id' | 'ap_batch_id'> & { _key: string; _file?: File };
 
@@ -127,7 +127,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
 
   if (!caseItem) return null;
 
-  const remaining = caseItem.approved_item_amount - apSubmittedTotal(batches, caseItem.id);
+  const remaining = caseItem.approved_item_amount - apCommittedTotal(batches, caseItem.id, existingBatch?.id);
   const billsTotal = bills.reduce((sum, b) => sum + (b.amount || 0), 0);
 
   // A batch already reviewed (or not built by the assigned Manager) can be sent normally; a

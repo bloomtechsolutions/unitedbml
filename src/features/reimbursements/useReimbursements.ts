@@ -308,6 +308,18 @@ export function apPaidTotal(batches: ApBatchWithBills[], caseId: string): number
     .reduce((sum, b) => sum + b.bills.reduce((s, bill) => s + bill.amount, 0), 0);
 }
 
+/** Everything committed against a case across every non-cancelled batch — Draft/pending-review
+ * ones included, since that money is already spoken for even before AP sends it. Pass
+ * excludeBatchId when validating a batch you're currently editing, so its own prior total
+ * doesn't count against itself. A case can have more than one batch over time (e.g. a first
+ * partial submission that's Paid, then a second one for the remaining balance), so this always
+ * sums across all of them rather than assuming just one. */
+export function apCommittedTotal(batches: ApBatchWithBills[], caseId: string, excludeBatchId?: string): number {
+  return batches
+    .filter((b) => b.reimbursement_id === caseId && b.status !== 'Cancelled' && b.id !== excludeBatchId)
+    .reduce((sum, b) => sum + b.bills.reduce((s, bill) => s + bill.amount, 0), 0);
+}
+
 export interface ManagerSubmission {
   managerUserId: string;
   managerName: string;

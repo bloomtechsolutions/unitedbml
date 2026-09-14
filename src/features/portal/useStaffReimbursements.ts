@@ -1,19 +1,9 @@
 import { useMemo } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import type { EventRow } from '../../types/database';
-import { apPaidTotal, useEligibleExpenseRequests, useReimbursementCases } from '../reimbursements/useReimbursements';
+import { apCommittedTotal, apPaidTotal, useEligibleExpenseRequests, useReimbursementCases } from '../reimbursements/useReimbursements';
 import type { ApBatchWithBills, EligibleExpenseRequest, ProcurementGroupCase } from '../reimbursements/types';
 import { useMyManagedEvents } from './usePortal';
-
-/** Everything the Manager has put forward for a case, whether or not AP has been sent yet —
- * unlike apSubmittedTotal (which only counts batches already sent to AP), this counts a
- * still-Draft/pending-review batch too, since from the Manager's perspective they've already
- * "submitted" it the moment they send it for committee review. */
-export function managerSubmittedTotal(batches: ApBatchWithBills[], caseId: string): number {
-  return batches
-    .filter((b) => b.reimbursement_id === caseId && b.status !== 'Cancelled')
-    .reduce((sum, b) => sum + b.bills.reduce((s, bill) => s + bill.amount, 0), 0);
-}
 
 export interface ManagedEventSummary {
   event: EventRow;
@@ -41,7 +31,7 @@ export function useStaffReimbursementWorkspace() {
       const eventEligible = eligible.filter((e) => e.eventId === event.id);
       const approvedFromCases = eventCases.reduce((s, c) => s + c.approved_item_amount, 0);
       const approvedFromEligible = eventEligible.reduce((s, r) => s + r.lines.reduce((ss, l) => ss + l.amount, 0), 0);
-      const submittedTotal = eventCases.reduce((s, c) => s + managerSubmittedTotal(batches, c.id), 0);
+      const submittedTotal = eventCases.reduce((s, c) => s + apCommittedTotal(batches, c.id), 0);
       const paidTotal = eventCases.reduce((s, c) => s + apPaidTotal(batches, c.id), 0);
       const pendingReviewCount = batches.filter((b) => eventCases.some((c) => c.id === b.reimbursement_id) && b.pending_review).length;
       const approvedTotal = approvedFromCases + approvedFromEligible;
@@ -83,12 +73,17 @@ export function useStaffReimbursementWorkspace() {
   };
 }
 
+/** The one Draft batch currently in flight for a case (submitted but not yet sent to AP), if
+ * any — a case can have several batches over time (e.g. a first partial submission already Paid,
+ * then a second for the remaining balance), but only one can be an open Draft at once. */
 export function draftBatchForCase(batches: ApBatchWithBills[], caseId: string): ApBatchWithBills | null {
   return batches.find((b) => b.reimbursement_id === caseId && b.status === 'Draft') ?? null;
 }
 
-export function latestBatchForCase(batches: ApBatchWithBills[], caseId: string): ApBatchWithBills | null {
-  const matches = batches.filter((b) => b.reimbursement_id === caseId && b.status !== 'Cancelled');
-  if (!matches.length) return null;
-  return matches.reduce((a, b) => (new Date(a.created_at) > new Date(b.created_at) ? a : b));
+/** Every non-cancelled batch for a case, newest first — the full submission history, not just
+ * the latest one, since a case can be submitted more than once as balance allows. */
+export function batchesForCase(batches: ApBatchWithBills[], caseId: string): ApBatchWithBills[] {
+  return batches
+    .filter((b) => b.reimbursement_id === caseId && b.status !== 'Cancelled')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
