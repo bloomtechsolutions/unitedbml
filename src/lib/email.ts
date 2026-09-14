@@ -182,12 +182,12 @@ export function outlookEmailTemplate(opts: {
     .join('');
 
   const itemsHtml = itemsTable
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0;border-collapse:collapse;">
-        <tr>${itemsTable.headers.map((h) => `<td style="padding:6px 8px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;">${h}</td>`).join('')}</tr>
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="1" style="margin:14px 0;border-collapse:collapse;border:1px solid #d1d5db;">
+        <tr>${itemsTable.headers.map((h) => `<td style="padding:6px 8px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;border:1px solid #d1d5db;">${h}</td>`).join('')}</tr>
         ${itemsTable.rows
           .map(
             (r) =>
-              `<tr>${r.map((c) => `<td style="padding:6px 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${c}</td>`).join('')}</tr>`
+              `<tr>${r.map((c) => `<td style="padding:6px 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111827;border:1px solid #d1d5db;">${c}</td>`).join('')}</tr>`
           )
           .join('')}
       </table>`
