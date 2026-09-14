@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import type { VendorMasterRow } from '../../types/database';
-import { decideExternalReimbursement, usePendingExternalReimbursements } from '../portal/usePortal';
 import { ApBatchModal } from './ApBatchModal';
 import { ApStatusModal } from './ApStatusModal';
 import { ExceptionModal } from './ExceptionModal';
@@ -23,7 +22,7 @@ import {
   useVendorMaster,
 } from './useReimbursements';
 
-type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'external' | 'vendors';
+type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'vendors';
 
 const VENDOR_MANAGER_ROLES = ['treasurer', 'president', 'chairperson', 'vice chairperson', 'vice_chairperson', 'secretary'];
 
@@ -35,12 +34,10 @@ export function ReimbursementsPage() {
   const { profile } = useAuth();
   const { cases, batches, loading, error, reload } = useReimbursementCases();
   const { eligible, loading: eligibleLoading } = useEligibleExpenseRequests(cases);
-  const { items: pendingExternal, loading: externalLoading, reload: reloadExternal } = usePendingExternalReimbursements();
   const { vendors, loading: vendorsLoading, reload: reloadVendors } = useVendorMaster();
   const toast = useToast();
 
   const [subTab, setSubTab] = useState<SubTab>('cases');
-  const [decidingId, setDecidingId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [reviewBatch, setReviewBatch] = useState<ApBatchWithBills | null>(null);
   const [groupTarget, setGroupTarget] = useState<EligibleExpenseRequest | null>(null);
@@ -89,21 +86,7 @@ export function ReimbursementsPage() {
     }
   };
 
-  const decideExternal = async (id: string, approve: boolean) => {
-    setDecidingId(id);
-    try {
-      await decideExternalReimbursement(id, approve);
-      toast(approve ? 'Reimbursement approved and released to AP' : 'Reimbursement rejected');
-      await reloadExternal();
-      await refresh();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to decide reimbursement.');
-    } finally {
-      setDecidingId(null);
-    }
-  };
-
-  if (loading || eligibleLoading || externalLoading) return <div>Loading reimbursements…</div>;
+  if (loading || eligibleLoading) return <div>Loading reimbursements…</div>;
   if (error) return <div style={{ color: 'var(--danger)' }}>Failed to load reimbursements: {error}</div>;
 
   return (
@@ -154,9 +137,6 @@ export function ReimbursementsPage() {
         <button className={`tab ${subTab === 'exceptions' ? 'active' : ''}`} onClick={() => setSubTab('exceptions')}>
           Exceptions ({exceptions.length})
         </button>
-        <button className={`tab ${subTab === 'external' ? 'active' : ''}`} onClick={() => setSubTab('external')}>
-          External Officials ({pendingExternal.length})
-        </button>
         <button className={`tab ${subTab === 'vendors' ? 'active' : ''}`} onClick={() => setSubTab('vendors')}>
           Vendors ({vendors.length})
         </button>
@@ -166,34 +146,45 @@ export function ReimbursementsPage() {
         <div>
           <h4>Eligible Approved Expense Items</h4>
           <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
-            Approved expense requests ready for reimbursement. Send an item for Standard Procurement pre-approval, or
-            record it as a No Pre-Approval / Exception case if it was already paid or doesn't need one.
+            These expense items are already Finance-approved and just need routing before bills can be submitted for
+            them — send a request for Standard Procurement pre-approval, or record an item as a No Pre-Approval /
+            Exception case if it was already paid or doesn't need one. Amounts appear once a case is opened below.
           </p>
-          {eligible.map((request) => (
-            <div key={request.expenseRequestId} className="reimb-card">
-              <div className="reimb-card-head">
-                <div>
-                  <b>{request.title || request.expenseRequestNumber}</b>
-                  <div className="reimb-meta">
-                    <span>{request.eventName || 'No event'}</span>
-                    <span>{request.lines.length} item(s)</span>
-                  </div>
-                </div>
-                <button className="btn primary" onClick={() => setGroupTarget(request)}>
-                  Standard Pre-Approval · All Items
-                </button>
-              </div>
-              {request.lines.map((line) => (
-                <div key={line.lineNo} className="reimb-flag">
-                  <span>{line.description}</span>
-                  <span>{line.amount.toLocaleString()}</span>
-                  <button className="btn ghost" onClick={() => setExceptionTarget(line)}>
-                    No Pre-Approval / Exception
-                  </button>
-                </div>
-              ))}
+          {eligible.length > 0 && (
+            <div style={{ overflowX: 'auto', marginBottom: 20 }}>
+              <table className="table" style={{ fontSize: 12.5 }}>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Request / Event</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {eligible.map((request) =>
+                    request.lines.map((line, i) => (
+                      <tr key={`${request.expenseRequestId}:${line.lineNo}`}>
+                        <td>{line.description}</td>
+                        <td style={{ color: 'var(--muted)' }}>
+                          {request.eventName || 'No event'} · {request.title || request.expenseRequestNumber}
+                        </td>
+                        <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          {i === 0 && (
+                            <button className="btn primary" onClick={() => setGroupTarget(request)}>
+                              Standard Pre-Approval{request.lines.length > 1 ? ` · All ${request.lines.length} Items` : ''}
+                            </button>
+                          )}
+                          <button className="btn ghost" onClick={() => setExceptionTarget(line)}>
+                            Exception
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          ))}
+          )}
           {!eligible.length && <p style={{ color: 'var(--muted)' }}>No approved expense items awaiting reimbursement processing.</p>}
 
           <h4 style={{ marginTop: 20 }}>Reimbursement Cases</h4>
@@ -425,36 +416,6 @@ export function ReimbursementsPage() {
             )}
           </tbody>
         </table>
-      )}
-
-      {subTab === 'external' && (
-        <div>
-          {pendingExternal.map((r) => (
-            <div className="external-approval-row" key={r.id}>
-              <div>
-                <b>{r.title}</b>
-                <small>
-                  {r.vendor_name || 'No vendor'} · {r.expense_date} · {r.reference_no || 'No reference'}
-                </small>
-              </div>
-              <div>MVR {r.amount.toFixed(2)}</div>
-              <div>{r.official_role || 'Official'}</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn ghost" disabled={decidingId === r.id} onClick={() => void decideExternal(r.id, false)}>
-                  Reject
-                </button>
-                <button className="btn primary" disabled={decidingId === r.id} onClick={() => void decideExternal(r.id, true)}>
-                  Approve
-                </button>
-              </div>
-            </div>
-          ))}
-          {!pendingExternal.length && (
-            <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 20 }}>
-              No External Event Official reimbursements awaiting approval.
-            </div>
-          )}
-        </div>
       )}
 
       {subTab === 'vendors' && (
