@@ -406,7 +406,13 @@ export { batchHistory };
  * Approved Expense Approval Note, inherited Procurement response evidence, and the bills, with a
  * persistent single-send lock so a duplicate click while the (potentially slow) send is in flight
  * can't fire the email twice. */
-export async function sendApBatch(batch: ApBatchWithBills, caseItem: ProcurementGroupCase, attachmentMode: AttachmentMode, actorName: string) {
+export async function sendApBatch(
+  batch: ApBatchWithBills,
+  caseItem: ProcurementGroupCase,
+  attachmentMode: AttachmentMode,
+  actorName: string,
+  actorRole: string = ''
+) {
   const { data: current, error: fetchError } = await supabase.from('ap_batches').select('status,data,sent_at').eq('id', batch.id).single();
   if (fetchError) throw fetchError;
   if (current.status !== 'Draft' || current.sent_at) {
@@ -463,8 +469,9 @@ export async function sendApBatch(batch: ApBatchWithBills, caseItem: Procurement
 
     const billsTotal = batch.bills.reduce((s, b) => s + Number(b.amount ?? 0), 0);
     const html = outlookEmailTemplate({
-      heading: 'Reimbursement Submissions',
-      intro: 'Dear Team, please find below the expenses of UBML to be processed as reimbursement.',
+      heading: '',
+      bannerSuffix: 'Reimbursement Submissions',
+      intro: 'Dear Team,<br/>Please find below the expenses of UBML to be processed as reimbursement.',
       rows: [
         { label: 'Submission Reference', value: batch.submission_ref ?? '' },
         { label: 'Reimbursement Case', value: caseItem.case_ref ?? '' },
@@ -480,13 +487,13 @@ export async function sendApBatch(batch: ApBatchWithBills, caseItem: Procurement
       },
       note: 'Please find attached the Expense Approval Note along with the bills.',
       signatureName: actorName,
-      signatureRole: 'Treasurer',
+      signatureRole: actorRole,
       signatureEmail: '',
     });
 
     const result = await sendEmail({
       to: batch.ap_email,
-      subject: `Reimbursement Submission: ${batch.submission_ref} - ${caseItem.expense_item}`,
+      subject: `Reimbursement Submission: ${batch.submission_ref} - ${caseItem.event_name || 'General'}`,
       html,
       attachments,
       emailType: 'AP Submission',
@@ -547,11 +554,12 @@ export async function approveAndSendApBatch(
   caseItem: ProcurementGroupCase,
   apEmail: string,
   attachmentMode: AttachmentMode,
-  actorName: string
+  actorName: string,
+  actorRole: string = ''
 ) {
   await setApBatchEmail(batch.id, apEmail);
   await reviewApBatch(batch.id, actorName);
-  await sendApBatch({ ...batch, ap_email: apEmail }, caseItem, attachmentMode, actorName);
+  await sendApBatch({ ...batch, ap_email: apEmail }, caseItem, attachmentMode, actorName, actorRole);
 }
 
 export async function updateApBatchStatus(batch: ApBatchWithBills, status: string, remarks: string, actorName: string) {

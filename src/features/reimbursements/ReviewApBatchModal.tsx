@@ -82,6 +82,7 @@ export function ReviewApBatchModal({ batch, caseItem, onClose, onDecided }: Prop
   const attachmentMode: AttachmentMode = batch.bills_attachment_path ? 'Combined' : 'Individual';
   const billsTotal = batch.bills.reduce((s, b) => s + b.amount, 0);
   const actorName = profile?.full_name || profile?.email || 'Unknown';
+  const actorRole = profile?.role || '';
 
   const handleApproveAndSend = async () => {
     if (!apEmail.trim()) {
@@ -91,7 +92,7 @@ export function ReviewApBatchModal({ batch, caseItem, onClose, onDecided }: Prop
     setBusy(true);
     setError(null);
     try {
-      await approveAndSendApBatch(batch, caseItem, apEmail.trim(), attachmentMode, actorName);
+      await approveAndSendApBatch(batch, caseItem, apEmail.trim(), attachmentMode, actorName, actorRole);
       toast('Approved and sent to Accounts Payable');
       await onDecided();
       onClose();

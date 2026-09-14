@@ -140,7 +140,11 @@ interface EmailRow {
 
 /** A 680px, inline-styled, table-based email body compatible with Outlook Desktop's rendering engine. */
 export function outlookEmailTemplate(opts: {
+  /** Shown as the bold line under the banner. Leave empty (with bannerSuffix set instead) to
+   * fold the heading into the banner itself rather than repeating it below. */
   heading: string;
+  /** Appended to the "UnitedBML" banner as "UnitedBML — {bannerSuffix}" when set. */
+  bannerSuffix?: string;
   intro: string;
   rows: EmailRow[];
   itemsTable?: { headers: string[]; rows: string[][] };
@@ -154,8 +158,22 @@ export function outlookEmailTemplate(opts: {
   signatureRole: string;
   signatureEmail: string;
 }): string {
-  const { heading, intro, rows, itemsTable, totalLabel, totalValue, note, advisory, boxedNote, ctaButton, signatureName, signatureRole, signatureEmail } =
-    opts;
+  const {
+    heading,
+    bannerSuffix,
+    intro,
+    rows,
+    itemsTable,
+    totalLabel,
+    totalValue,
+    note,
+    advisory,
+    boxedNote,
+    ctaButton,
+    signatureName,
+    signatureRole,
+    signatureEmail,
+  } = opts;
   const rowsHtml = rows
     .map(
       (r) =>
@@ -218,10 +236,10 @@ export function outlookEmailTemplate(opts: {
 <![endif]-->
 <table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" align="center" style="width:680px;max-width:680px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;">
   <tr><td style="padding:20px 24px;background:#2563eb;">
-    <span style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#ffffff;font-weight:bold;">UnitedBML</span>
+    <span style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#ffffff;font-weight:bold;">UnitedBML${bannerSuffix ? ` &mdash; ${bannerSuffix}` : ''}</span>
   </td></tr>
   <tr><td style="padding:24px;background:#ffffff;border:1px solid #e5e7eb;border-top:none;">
-    <p style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;margin:0 0 4px;font-weight:bold;">${heading}</p>
+    ${heading ? `<p style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;margin:0 0 4px;font-weight:bold;">${heading}</p>` : ''}
     <p style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#374151;margin:0 0 16px;">${intro}</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:6px;">${rowsHtml}</table>
     ${itemsHtml}
