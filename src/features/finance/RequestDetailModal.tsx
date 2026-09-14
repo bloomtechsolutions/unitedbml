@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useAuth } from '../../lib/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { useToast } from '../../lib/ToastContext';
 import { notifyExpenseApprover, notifyExpenseDecision } from './emailNotifications';
 import type { ExpenseRequestWithLines } from './types';
@@ -60,6 +61,35 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
       }
     } catch (err) {
       console.error('Expense approval email failed', err);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    setBusy(true);
+    try {
+      if (request.status === 'Pending President Recommendation') {
+        const { data: president } = await supabase
+          .from('committee_members')
+          .select('name,email')
+          .eq('role', 'President')
+          .maybeSingle();
+        if (!president?.email) throw new Error('No active President email found in Committee.');
+        await notifyExpenseApprover(request, president.email, president.name || '', 'President Recommendation', request.lines);
+      } else if (request.status === 'Pending Final Approval') {
+        if (!request.final_approver_email) throw new Error('No final approver email set for this request.');
+        await notifyExpenseApprover(
+          request,
+          request.final_approver_email,
+          request.final_approver_name || '',
+          'Final Approval',
+          request.lines
+        );
+      }
+      toast('Approval email resent.');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to resend the approval email.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -172,6 +202,12 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
       )}
 
       <div className="modal-actions">
+        {(request.status === 'Pending President Recommendation' || request.status === 'Pending Final Approval') && (
+          <button className="btn ghost" disabled={busy} onClick={() => void handleResendEmail()}>
+            Resend Approval Email
+          </button>
+        )}
+
         {request.status === 'Draft' && (
           <button className="btn danger" disabled={busy} onClick={() => void act(() => cancelRequest(request.id), 'Request cancelled')}>
             Cancel Request
