@@ -55,9 +55,17 @@ export async function generateApprovedExpenseNotePdf(expenseRequestId: string): 
   doc.setTextColor(0, 0, 0);
   y = 108;
 
-  const ref = `UNITEDBML/APN/${new Date(request.approved_at || request.submitted_at || Date.now()).getFullYear().toString().slice(-2)}/${request.request_number?.replace(/\D/g, '').slice(-3) || '1'}`;
+  const approvedAt = request.approved_at || request.submitted_at || new Date().toISOString();
+  const approvalYear = new Date(approvedAt).getFullYear();
+  const { count: approvalSeq } = await supabase
+    .from('expense_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'Approved')
+    .gte('approved_at', `${approvalYear}-01-01T00:00:00.000Z`)
+    .lte('approved_at', approvedAt);
+  const ref = `UNITEDBML/APN/${approvalYear.toString().slice(-2)}/${String(approvalSeq || 1).padStart(3, '0')}`;
   const finalApprover = `${request.final_approver_name || 'Final Approver'}, ${request.final_approver_role || ''}, UnitedBML`;
-  const preparedBy = `${request.approved_by_name || request.final_approver_name || 'Committee'}, ${request.approved_by_role || request.final_approver_role || ''}, UnitedBML`;
+  const preparedBy = `${request.recommended_by_name || 'President'}, ${request.recommended_by_role || 'President'}, UnitedBML`;
 
   doc.setFontSize(10.5);
   const metaField = (label: string, value: string) => {
