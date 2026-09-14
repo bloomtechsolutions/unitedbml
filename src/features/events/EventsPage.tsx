@@ -220,27 +220,53 @@ export function EventsPage() {
               </select>
             </div>
           </div>
-          <div className="event-grid">
-            {filtered.map(({ event, lifecycle, prep }) => (
-              <div key={event.id} className="event-card" onClick={() => setDetailId(event.id)}>
-                <div style={{ padding: 16 }}>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <div className="pill plan">{event.event_type || 'General'}</div>
-                    {event.event_scope === 'External' && <div className="pill">External</div>}
-                  </div>
-                  <h3 style={{ margin: '10px 0 4px' }}>{event.name}</h3>
-                  <small style={{ color: 'var(--muted)' }}>
-                    {event.event_date || 'No date'} · {event.venue || 'No venue'}
-                  </small>
-                  <p style={{ fontSize: 12, color: 'var(--muted)', margin: '10px 0' }}>
-                    Coordinator: {event.coordinator || '—'}
-                  </p>
-                  <div className="pill open">{lifecycle}</div>
-                  <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)' }}>Preparation: {prep}%</div>
-                </div>
-              </div>
-            ))}
-            {!filtered.length && <div style={{ color: 'var(--muted)' }}>No events match your filters.</div>}
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Type</th>
+                  <th>Date</th>
+                  <th>Venue</th>
+                  <th>Coordinator</th>
+                  <th>Status</th>
+                  <th>Preparation</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(({ event, lifecycle, prep }) => (
+                  <tr key={event.id} onClick={() => setDetailId(event.id)} style={{ cursor: 'pointer' }}>
+                    <td>{event.name}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <span className="pill plan">{event.event_type || 'General'}</span>
+                        {event.event_scope === 'External' && <span className="pill">External</span>}
+                      </div>
+                    </td>
+                    <td>{event.event_date || '—'}</td>
+                    <td>{event.venue || '—'}</td>
+                    <td>{event.coordinator || '—'}</td>
+                    <td>
+                      <span className="pill open">{lifecycle}</span>
+                    </td>
+                    <td>{prep}%</td>
+                    <td>
+                      <button className="btn ghost" onClick={(e) => { e.stopPropagation(); setDetailId(event.id); }}>
+                        Open
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!filtered.length && (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                      No events match your filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </>
       )}
