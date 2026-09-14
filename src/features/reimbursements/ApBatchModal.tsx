@@ -253,10 +253,12 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
             <label>Vendor</label>
             <VendorField bill={bill} onChange={(patch) => updateBill(bill._key, patch)} />
           </div>
-          <div className="field">
-            <label>Worker ID</label>
-            <input value={bill.worker_id ?? ''} readOnly />
-          </div>
+          {isCommitteeUser && (
+            <div className="field">
+              <label>Worker ID</label>
+              <input value={bill.worker_id ?? ''} readOnly />
+            </div>
+          )}
           <div className="field">
             <label>Amount</label>
             <input
@@ -293,10 +295,12 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
       )}
 
       <div className="form-grid" style={{ marginTop: 16 }}>
-        <div className="field">
-          <label>AP Email</label>
-          <input type="email" value={apEmail} onChange={(e) => setApEmail(e.target.value)} disabled={readOnlyForManager} />
-        </div>
+        {isCommitteeUser && (
+          <div className="field">
+            <label>AP Email</label>
+            <input type="email" value={apEmail} onChange={(e) => setApEmail(e.target.value)} disabled={readOnlyForManager} />
+          </div>
+        )}
         {attachmentMode === 'Combined' && (
           <div className="field">
             <label>Combined Bills Attachment</label>
