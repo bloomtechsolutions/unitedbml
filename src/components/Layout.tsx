@@ -114,9 +114,11 @@ function initials(name: string): string {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { profile, isAdministrator, signOut } = useAuth();
+  const { profile, isAdministrator, isCommitteeUser, committeeChecked, signOut } = useAuth();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const navAreas =
+    !committeeChecked || isCommitteeUser ? NAV_AREAS : NAV_AREAS.filter((a) => a.label === 'Dashboard' || a.label === 'My Space');
 
   useEffect(() => {
     try {
@@ -160,7 +162,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {NAV_AREAS.map((area) => {
+          {navAreas.map((area) => {
             const active = isAreaActive(area);
             const visibleSubItems = (area.subItems ?? []).filter((s) => !s.adminOnly || isAdministrator);
             return (

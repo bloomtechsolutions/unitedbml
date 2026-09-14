@@ -86,7 +86,7 @@ interface Props {
 }
 
 export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSaved }: Props) {
-  const { profile, session } = useAuth();
+  const { profile, session, isCommitteeUser } = useAuth();
   const [bills, setBills] = useState<DraftBill[]>([emptyBill()]);
   const [apEmail, setApEmail] = useState('');
   const [attachmentMode, setAttachmentMode] = useState<AttachmentMode>('Combined');
@@ -134,6 +134,10 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
   // fresh submission from the assigned Manager must go through committee review first.
   const isManagerSubmission = !!eventManagerUserId && !!session?.user.id && session.user.id === eventManagerUserId;
   const needsReview = existingBatch ? existingBatch.pending_review : isManagerSubmission;
+  // Once a committee member reviews a Manager's submission, the Manager loses write access to it
+  // (enforced by RLS) — reflect that here instead of letting them hit a failed save.
+  const readOnlyForManager =
+    !isCommitteeUser && !!existingBatch && existingBatch.submitted_by_manager && !existingBatch.pending_review;
 
   const updateBill = (key: string, patch: Partial<DraftBill>) => {
     setBills((prev) => prev.map((b) => (b._key === key ? { ...b, ...patch } : b)));
@@ -238,7 +242,12 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         <div key={bill._key} className="ap-bill-row">
           <div className="field">
             <label>Bill Date</label>
-            <input type="date" value={bill.bill_date ?? ''} onChange={(e) => updateBill(bill._key, { bill_date: e.target.value })} />
+            <input
+              type="date"
+              value={bill.bill_date ?? ''}
+              onChange={(e) => updateBill(bill._key, { bill_date: e.target.value })}
+              disabled={readOnlyForManager}
+            />
           </div>
           <div className="field">
             <label>Vendor</label>
@@ -250,7 +259,13 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
           </div>
           <div className="field">
             <label>Amount</label>
-            <input type="number" min={0} value={bill.amount} onChange={(e) => updateBill(bill._key, { amount: Number(e.target.value) })} />
+            <input
+              type="number"
+              min={0}
+              value={bill.amount}
+              onChange={(e) => updateBill(bill._key, { amount: Number(e.target.value) })}
+              disabled={readOnlyForManager}
+            />
           </div>
           {attachmentMode === 'Individual' && (
             <div className="field">
@@ -259,33 +274,50 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg"
                 onChange={(e) => updateBill(bill._key, { _file: e.target.files?.[0] })}
+                disabled={readOnlyForManager}
               />
               {bill._file && <div className="ap-bill-file">{bill._file.name}</div>}
             </div>
           )}
-          <button className="btn danger" onClick={() => setBills((prev) => prev.filter((b) => b._key !== bill._key))}>
-            Remove
-          </button>
+          {!readOnlyForManager && (
+            <button className="btn danger" onClick={() => setBills((prev) => prev.filter((b) => b._key !== bill._key))}>
+              Remove
+            </button>
+          )}
         </div>
       ))}
-      <button className="btn ghost" onClick={() => setBills((prev) => [...prev, emptyBill()])}>
-        + Add Bill
-      </button>
+      {!readOnlyForManager && (
+        <button className="btn ghost" onClick={() => setBills((prev) => [...prev, emptyBill()])}>
+          + Add Bill
+        </button>
+      )}
 
       <div className="form-grid" style={{ marginTop: 16 }}>
         <div className="field">
           <label>AP Email</label>
-          <input type="email" value={apEmail} onChange={(e) => setApEmail(e.target.value)} />
+          <input type="email" value={apEmail} onChange={(e) => setApEmail(e.target.value)} disabled={readOnlyForManager} />
         </div>
         {attachmentMode === 'Combined' && (
           <div className="field">
             <label>Combined Bills Attachment</label>
-            <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setCombinedFile(e.target.files?.[0] ?? null)} />
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(e) => setCombinedFile(e.target.files?.[0] ?? null)}
+              disabled={readOnlyForManager}
+            />
           </div>
         )}
       </div>
 
-      {needsReview && (
+      {readOnlyForManager && (
+        <div className="ub-banner ub-banner-success" style={{ marginTop: 16 }}>
+          This submission has been reviewed by the committee. It's now with them to send to Accounts Payable — no further
+          changes are possible here.
+        </div>
+      )}
+
+      {!readOnlyForManager && needsReview && (
         <div className="ub-banner ub-banner-accent" style={{ marginTop: 16 }}>
           {existingBatch?.reviewed_at
             ? 'Reviewed — this batch can now be sent to Accounts Payable.'
@@ -299,12 +331,14 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
       {error && <div style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>{error}</div>}
       <div className="modal-actions">
         <button className="btn ghost" onClick={onClose} disabled={saving}>
-          Cancel
+          {readOnlyForManager ? 'Close' : 'Cancel'}
         </button>
-        <button className="btn soft" onClick={() => void handleSaveDraft(false)} disabled={saving}>
-          {needsReview && !existingBatch ? 'Submit for Committee Review' : 'Save Draft'}
-        </button>
-        {!needsReview && (
+        {!readOnlyForManager && (
+          <button className="btn soft" onClick={() => void handleSaveDraft(false)} disabled={saving}>
+            {needsReview && !existingBatch ? 'Submit for Committee Review' : 'Save Draft'}
+          </button>
+        )}
+        {!readOnlyForManager && !needsReview && (
           <button className="btn primary" onClick={() => void handleSaveDraft(true)} disabled={saving}>
             {saving ? 'Sending…' : 'Send AP Email + Attachments'}
           </button>

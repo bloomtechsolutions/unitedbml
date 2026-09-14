@@ -9,6 +9,7 @@ import { canCheckInToMeeting } from '../meetings/status';
 import { useMyMeetings } from '../dashboard/useMyMeetings';
 import { useLeaderboard } from '../leaderboard/useLeaderboard';
 import { ReimbursementFormModal } from './ReimbursementFormModal';
+import { StaffPortalPage } from './StaffPortalPage';
 import {
   useMyCommitteeId,
   useMyExternalReimbursements,
@@ -24,6 +25,13 @@ function normalize(value: string | null | undefined): string {
 const ACTIVITY_ICON: Record<string, string> = { event: '◉', task: '✓', win: '★' };
 
 export function PortalPage() {
+  const { isCommitteeUser, committeeChecked } = useAuth();
+  if (!committeeChecked) return null;
+  if (!isCommitteeUser) return <StaffPortalPage />;
+  return <CommitteePortalPage />;
+}
+
+function CommitteePortalPage() {
   const { profile, session } = useAuth();
   const toast = useToast();
   const committeeId = useMyCommitteeId(session?.user.id);

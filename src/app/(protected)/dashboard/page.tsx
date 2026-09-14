@@ -9,6 +9,7 @@ import { useDashboard } from '../../../features/dashboard/useDashboard';
 import { markAllNotificationsRead, markNotificationRead, useNotifications } from '../../../features/notifications/useNotifications';
 import { checkInToMeeting } from '../../../features/meetings/useMeetings';
 import { canCheckInToMeeting } from '../../../features/meetings/status';
+import { StaffDashboardPage } from '../../../features/portal/StaffDashboardPage';
 
 function money(n: number): string {
   return `MVR ${Math.round(n).toLocaleString()}`;
@@ -25,7 +26,13 @@ function timeAgo(iso: string): string {
 }
 
 export default function DashboardPage() {
-  const { profile, session } = useAuth();
+  const { profile, session, isCommitteeUser, committeeChecked } = useAuth();
+  if (!committeeChecked) return null;
+  if (!isCommitteeUser) return <StaffDashboardPage />;
+  return <ExecutiveDashboardPage profile={profile} session={session} />;
+}
+
+function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<typeof useAuth>['profile']; session: ReturnType<typeof useAuth>['session'] }) {
   const dash = useDashboard(profile);
   const { summaries, myCommitteeId, reload: reloadMeetings } = useMyMeetings(session?.user.id);
   const { notifications, unreadCount, reload: reloadNotifications } = useNotifications(session?.user.id);

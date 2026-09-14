@@ -11,6 +11,9 @@ interface AuthState {
   loading: boolean;
   isAdministrator: boolean;
   isCommitteeUser: boolean;
+  /** True once isCommitteeUser reflects a real server answer (not just its false default) —
+   * guard any committee-only redirect on this too, or you'll bounce committee users on load. */
+  committeeChecked: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -22,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCommitteeUser, setIsCommitteeUser] = useState(false);
+  const [committeeChecked, setCommitteeChecked] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -49,10 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session) {
       setIsCommitteeUser(false);
+      setCommitteeChecked(false);
       return;
     }
     let active = true;
     setLoading(true);
+    setCommitteeChecked(false);
     supabase
       .from('profiles')
       .select('*')
@@ -72,9 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to resolve committee access', error);
+        setCommitteeChecked(true);
         return;
       }
       setIsCommitteeUser(Boolean(data));
+      setCommitteeChecked(true);
     });
     return () => {
       active = false;
@@ -104,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         isAdministrator: profile?.role === 'Administrator',
         isCommitteeUser,
+        committeeChecked,
         signOut,
         refreshProfile,
       }}

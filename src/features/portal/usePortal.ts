@@ -1,7 +1,36 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { ExternalEventOfficialRow, ExternalEventReimbursementRow, Profile } from '../../types/database';
+import type { EventRow, ExternalEventOfficialRow, ExternalEventReimbursementRow, Profile } from '../../types/database';
 import type { MyApprovalItem, MyTaskItem, OfficialAssignment } from './types';
+
+/** Events where the logged-in user is the assigned Reimbursement Manager — works for committee
+ * and non-committee ("Staff Member") accounts alike, since `events` is broadly readable. */
+export function useMyManagedEvents(userId: string | undefined) {
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    if (!userId) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const { data } = await supabase
+      .from('events')
+      .select('*')
+      .eq('reimbursement_manager_user_id', userId)
+      .order('event_date', { ascending: false });
+    setEvents(data ?? []);
+    setLoading(false);
+  }, [userId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { events, loading, reload };
+}
 
 /** Resolves the logged-in user's own committee_members row, so tasks/meetings can be scoped to
  * them specifically rather than shown organization-wide. */
