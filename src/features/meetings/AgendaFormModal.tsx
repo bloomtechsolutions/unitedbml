@@ -21,7 +21,7 @@ const EMPTY: Values = { title: '', owner: '', minutes_allocated: 10, outcome: ''
 const STANDARD_OUTCOMES = ['', 'Approved', 'Noted', 'Deferred', 'Rejected', 'Create Event / Activity'];
 
 function emptyItem(): RequiredItem {
-  return { id: crypto.randomUUID(), description: '', category: '', estimatedAmount: 0, reimbursable: true };
+  return { id: crypto.randomUUID(), description: '', quantity: 1, amount: 0, reimbursable: true };
 }
 
 interface Props {
@@ -169,29 +169,35 @@ export function AgendaFormModal({ open, onClose, editing, coordinators, nextSort
         </p>
         {values.requiredItems.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 90px 110px 110px auto', gap: 8, fontSize: 11, fontWeight: 600, color: 'var(--ub-ink-faint)', textTransform: 'uppercase' }}>
+              <span>Description</span>
+              <span>Quantity</span>
+              <span>Amount</span>
+              <span>Total</span>
+              <span />
+            </div>
             {values.requiredItems.map((item) => (
-              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto auto', gap: 8, alignItems: 'center' }}>
+              <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 90px 110px 110px auto', gap: 8, alignItems: 'center' }}>
                 <input
                   placeholder="Item description"
                   value={item.description}
                   onChange={(e) => updateItem(item.id, { description: e.target.value })}
                 />
                 <input
-                  placeholder="Category"
-                  value={item.category}
-                  onChange={(e) => updateItem(item.id, { category: e.target.value })}
+                  type="number"
+                  min={0}
+                  value={item.quantity || ''}
+                  onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })}
                 />
                 <input
                   type="number"
                   min={0}
-                  placeholder="Est. amount"
-                  value={item.estimatedAmount || ''}
-                  onChange={(e) => updateItem(item.id, { estimatedAmount: Number(e.target.value) })}
+                  value={item.amount || ''}
+                  onChange={(e) => updateItem(item.id, { amount: Number(e.target.value) })}
                 />
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, whiteSpace: 'nowrap' }}>
-                  <input type="checkbox" checked={item.reimbursable} onChange={(e) => updateItem(item.id, { reimbursable: e.target.checked })} />
-                  Reimbursable
-                </label>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ub-ink-soft)' }}>
+                  {((item.quantity || 0) * (item.amount || 0)).toLocaleString()}
+                </div>
                 <button className="ub-btn ub-btn-danger" style={{ padding: '7px 10px', fontSize: 12 }} onClick={() => removeItem(item.id)}>
                   Remove
                 </button>

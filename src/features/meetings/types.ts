@@ -19,8 +19,8 @@ export interface MeetingWithChildren extends MeetingRow {
 export interface RequiredItem {
   id: string;
   description: string;
-  category: string;
-  estimatedAmount: number;
+  quantity: number;
+  amount: number;
   reimbursable: boolean;
 }
 

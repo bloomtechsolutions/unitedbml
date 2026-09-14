@@ -247,7 +247,7 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {meeting.agenda.map((item) => {
-              const requiredItems = (item.data as { requiredItems?: { id: string; description: string; category: string; estimatedAmount: number; reimbursable: boolean }[] } | null)?.requiredItems ?? [];
+              const requiredItems = (item.data as { requiredItems?: { id: string; description: string; quantity: number; amount: number; reimbursable: boolean }[] } | null)?.requiredItems ?? [];
               const itemDecisions = meeting.decisions.filter((d) => d.agenda_id === item.id);
               const itemActions = meeting.actions.filter((a) => a.agenda_id === item.id);
               return (
@@ -276,9 +276,11 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                       {requiredItems.map((ri) => (
                         <div key={ri.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '3px 0' }}>
                           <span>
-                            {ri.description} {ri.category && <span style={{ color: 'var(--ub-ink-faint)' }}>· {ri.category}</span>}
+                            {ri.description} {ri.quantity > 1 && <span style={{ color: 'var(--ub-ink-faint)' }}>× {ri.quantity}</span>}
                           </span>
-                          <span style={{ color: 'var(--ub-ink-faint)' }}>{ri.estimatedAmount ? `MVR ${ri.estimatedAmount}` : ''}</span>
+                          <span style={{ color: 'var(--ub-ink-faint)' }}>
+                            {ri.amount ? `MVR ${((ri.quantity || 1) * ri.amount).toLocaleString()}` : ''}
+                          </span>
                         </div>
                       ))}
                     </div>

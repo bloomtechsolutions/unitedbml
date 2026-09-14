@@ -133,8 +133,8 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
         if (!isPristine) return prev;
         return requiredItems.map((item) => ({
           description: item.description,
-          quantity: 1,
-          rate: item.estimatedAmount || 0,
+          quantity: item.quantity || 1,
+          rate: item.amount || 0,
           vendor: '',
           reimbursement_required: item.reimbursable,
         }));
