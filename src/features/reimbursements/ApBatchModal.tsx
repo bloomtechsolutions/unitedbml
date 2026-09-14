@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
-import { useMyCommitteeId } from '../portal/usePortal';
 import type { ApBillRow, VendorMasterRow } from '../../types/database';
 import { ATTACHMENT_MODES } from './types';
 import type { ApBatchWithBills, AttachmentMode, ProcurementGroupCase } from './types';
@@ -88,7 +87,6 @@ interface Props {
 
 export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSaved }: Props) {
   const { profile, session } = useAuth();
-  const myCommitteeId = useMyCommitteeId(session?.user.id);
   const [bills, setBills] = useState<DraftBill[]>([emptyBill()]);
   const [apEmail, setApEmail] = useState('');
   const [attachmentMode, setAttachmentMode] = useState<AttachmentMode>('Combined');
@@ -96,7 +94,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
   const [saving, setSaving] = useState(false);
   const [sendProgress, setSendProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [eventManagerCommitteeId, setEventManagerCommitteeId] = useState<string | null>(null);
+  const [eventManagerUserId, setEventManagerUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (existingBatch) {
@@ -116,15 +114,15 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
 
   useEffect(() => {
     if (!caseItem?.event_id) {
-      setEventManagerCommitteeId(null);
+      setEventManagerUserId(null);
       return;
     }
     supabase
       .from('events')
-      .select('reimbursement_manager_committee_id')
+      .select('reimbursement_manager_user_id')
       .eq('id', caseItem.event_id)
       .maybeSingle()
-      .then(({ data }) => setEventManagerCommitteeId(data?.reimbursement_manager_committee_id ?? null));
+      .then(({ data }) => setEventManagerUserId(data?.reimbursement_manager_user_id ?? null));
   }, [caseItem?.event_id]);
 
   if (!caseItem) return null;
@@ -134,7 +132,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
 
   // A batch already reviewed (or not built by the assigned Manager) can be sent normally; a
   // fresh submission from the assigned Manager must go through committee review first.
-  const isManagerSubmission = !!eventManagerCommitteeId && !!myCommitteeId && myCommitteeId === eventManagerCommitteeId;
+  const isManagerSubmission = !!eventManagerUserId && !!session?.user.id && session.user.id === eventManagerUserId;
   const needsReview = existingBatch ? existingBatch.pending_review : isManagerSubmission;
 
   const updateBill = (key: string, patch: Partial<DraftBill>) => {
@@ -160,7 +158,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
         bills.map(({ _key: _k, _file: _f, ...b }) => b),
         apEmail,
         !existingBatch && isManagerSubmission
-          ? { managerCommitteeId: myCommitteeId!, managerName: profile?.full_name || profile?.email || 'Unknown' }
+          ? { managerUserId: session!.user.id, managerName: profile?.full_name || profile?.email || 'Unknown' }
           : undefined
       );
 

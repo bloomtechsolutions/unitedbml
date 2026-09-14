@@ -763,8 +763,7 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
       <AssignReimbursementManagerModal
         open={assignManagerOpen}
         eventId={event.id}
-        currentCommitteeId={event.reimbursement_manager_committee_id}
-        members={coordinators}
+        currentUserId={event.reimbursement_manager_user_id}
         onClose={() => setAssignManagerOpen(false)}
         onSaved={onRefresh}
       />

@@ -309,7 +309,7 @@ export function apPaidTotal(batches: ApBatchWithBills[], caseId: string): number
 }
 
 export interface ManagerSubmission {
-  managerCommitteeId: string;
+  managerUserId: string;
   managerName: string;
 }
 
@@ -333,7 +333,7 @@ export async function saveApBatchDraft(
         ? {
             submitted_by_manager: true,
             pending_review: true,
-            manager_committee_id: managerSubmission.managerCommitteeId,
+            manager_user_id: managerSubmission.managerUserId,
             manager_submitted_by: managerSubmission.managerName,
             manager_submitted_at: new Date().toISOString(),
           }
