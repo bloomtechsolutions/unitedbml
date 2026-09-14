@@ -115,6 +115,47 @@ export async function eventBudgetActual(): Promise<ReportResult> {
   };
 }
 
+export async function actualExpenseLines(): Promise<ReportResult> {
+  const [lines, events, requests] = await Promise.all([
+    all<Record<string, unknown>>('event_actual_expenses'),
+    all<Record<string, unknown>>('events', 'id,name,finance_settlement_status'),
+    all<Record<string, unknown>>('expense_requests', 'id,title,request_number,finance_settlement_status'),
+  ]);
+  const eventById = new Map(events.map((e) => [e.id as string, e]));
+  const requestById = new Map(requests.map((r) => [r.id as string, r]));
+
+  return {
+    columns: [
+      col('activity', 'Activity', text),
+      col('expense_item', 'Expense Item', text),
+      col('source_type', 'Source', text),
+      col('approved_amount', 'Approved', money),
+      col('actual_amount', 'Actual', money),
+      col('variance_amount', 'Variance', money),
+      col('settlement_status', 'Settlement', status),
+      col('entered_date', 'Date', date),
+    ],
+    rows: lines.map((l) => {
+      const settlementKey = (l.settlement_key as string) ?? '';
+      const isGeneral = settlementKey.startsWith('REQ:');
+      const eventId = (l.event_id as string) ?? (isGeneral ? null : settlementKey || null);
+      const event = eventId ? eventById.get(eventId) : undefined;
+      const request = isGeneral ? requestById.get(settlementKey.slice(4)) : undefined;
+      const activity = event ? (event.name as string) : request ? `General: ${(request.title as string) || (request.request_number as string) || ''}` : 'Unknown';
+      return {
+        ...l,
+        activity,
+        settlement_status: (event?.finance_settlement_status as string) ?? (request?.finance_settlement_status as string) ?? null,
+        entered_date: (l.created_at as string)?.slice(0, 10) ?? null,
+        _date: (l.created_at as string)?.slice(0, 10) ?? null,
+        _eventId: eventId,
+        _eventName: activity,
+        _status: (event?.finance_settlement_status as string) ?? (request?.finance_settlement_status as string) ?? null,
+      };
+    }),
+  };
+}
+
 export async function monthlyExpense(): Promise<ReportResult> {
   const requests = await all<{ status: string; total_amount: number; request_date: string | null }>('expense_requests');
   const byMonth = new Map<string, number>();
@@ -469,6 +510,8 @@ export async function runReport(id: string, month: string): Promise<ReportResult
       return budgetUtilization();
     case 'event-budget-actual':
       return eventBudgetActual();
+    case 'actual-expense-lines':
+      return actualExpenseLines();
     case 'monthly-expense':
       return monthlyExpense();
     case 'reimbursement-master':

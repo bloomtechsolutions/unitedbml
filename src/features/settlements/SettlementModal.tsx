@@ -67,7 +67,10 @@ export function SettlementModal({ settlementKey, onClose, onChanged }: Props) {
       'General Expense Settlement'
     : (entity as { name?: string } | null)?.name || 'Event Settlement';
 
-  const overspend = totals.actual > totals.approved + 0.01;
+  const overLineItems = lines.filter(
+    (l) => l.sourceType === 'Direct Entry' && (drafts[l.sourceKey] ?? 0) > l.approvedAmount + 0.01
+  );
+  const overspend = overLineItems.length > 0;
   const allDirectEntered = lines.filter((l) => l.sourceType === 'Direct Entry').every((l) => drafts[l.sourceKey] !== undefined);
   const allReimbursementSettled = lines.filter((l) => l.sourceType === 'Reimbursement').every((l) => l.settled);
   const hasPendingContingency = contingencyRequests.some((c) => CONTINGENCY_ACTIVE_STATUSES.includes(c.status));
@@ -77,8 +80,10 @@ export function SettlementModal({ settlementKey, onClose, onChanged }: Props) {
       setError('Enter an actual amount for every Direct Entry line before saving.');
       return;
     }
-    if (overspend && !remarks.trim()) {
-      setError('Actual spend exceeds the approved amount — add settlement remarks explaining the overspend.');
+    if (overspend) {
+      setError(
+        `Actual exceeds the approved amount for: ${overLineItems.map((l) => l.expenseItem).join(', ')}. Request contingency to raise the approved amount before entering a higher actual.`
+      );
       return;
     }
     setSaving(true);
@@ -108,6 +113,12 @@ export function SettlementModal({ settlementKey, onClose, onChanged }: Props) {
   };
 
   const handleClose = async () => {
+    if (overspend) {
+      setError(
+        `Actual exceeds the approved amount for: ${overLineItems.map((l) => l.expenseItem).join(', ')}. Request contingency or correct the actuals before closing.`
+      );
+      return;
+    }
     if (!allReimbursementSettled) {
       setError('All reimbursement lines must be settled (AP batch Paid) before closing.');
       return;
@@ -162,6 +173,7 @@ export function SettlementModal({ settlementKey, onClose, onChanged }: Props) {
                   const variance = l.approvedAmount - actualValue;
                   const request = requests.find((r) => r.id === l.expenseRequestId);
                   const available = request ? contingencyAvailableForRequest(contingencyAll, request) : 0;
+                  const overLine = l.sourceType === 'Direct Entry' && actualValue > l.approvedAmount + 0.01;
                   return (
                     <tr key={l.sourceKey}>
                       <td>{l.expenseItem}</td>
@@ -180,14 +192,22 @@ export function SettlementModal({ settlementKey, onClose, onChanged }: Props) {
                       </td>
                       <td>
                         {l.sourceType === 'Direct Entry' ? (
-                          <input
-                            type="number"
-                            min={0}
-                            style={{ width: 110 }}
-                            value={drafts[l.sourceKey] ?? ''}
-                            onChange={(e) => setDrafts((prev) => ({ ...prev, [l.sourceKey]: Number(e.target.value) }))}
-                            disabled={status === 'Closed'}
-                          />
+                          <>
+                            <input
+                              type="number"
+                              min={0}
+                              max={l.approvedAmount}
+                              style={{ width: 110, borderColor: overLine ? 'var(--ub-danger, #dc2626)' : undefined }}
+                              value={drafts[l.sourceKey] ?? ''}
+                              onChange={(e) => setDrafts((prev) => ({ ...prev, [l.sourceKey]: Number(e.target.value) }))}
+                              disabled={status === 'Closed'}
+                            />
+                            {overLine && (
+                              <div style={{ fontSize: 10.5, color: 'var(--ub-danger, #dc2626)', marginTop: 2 }}>
+                                Exceeds approved ({l.approvedAmount.toLocaleString()})
+                              </div>
+                            )}
+                          </>
                         ) : (
                           actualValue.toLocaleString()
                         )}
@@ -253,13 +273,7 @@ export function SettlementModal({ settlementKey, onClose, onChanged }: Props) {
             </div>
           )}
 
-          {overspend && (
-            <div className="ub-field" style={{ marginTop: 16 }}>
-              <label>Settlement Remarks (required — actual exceeds approved)</label>
-              <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} disabled={status === 'Closed'} />
-            </div>
-          )}
-          {!overspend && status !== 'Closed' && (
+          {status !== 'Closed' && (
             <div className="ub-field" style={{ marginTop: 16 }}>
               <label>Settlement Remarks (optional)</label>
               <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} />
@@ -273,12 +287,12 @@ export function SettlementModal({ settlementKey, onClose, onChanged }: Props) {
               Close
             </button>
             {status !== 'Closed' && (
-              <button className="ub-btn ub-btn-secondary" onClick={() => void handleSave()} disabled={saving}>
+              <button className="ub-btn ub-btn-secondary" onClick={() => void handleSave()} disabled={saving || overspend}>
                 {saving ? 'Saving…' : 'Save Actuals'}
               </button>
             )}
             {isCommitteeUser && status !== 'Closed' && (
-              <button className="ub-btn ub-btn-primary" onClick={() => void handleClose()} disabled={closing || !entity}>
+              <button className="ub-btn ub-btn-primary" onClick={() => void handleClose()} disabled={closing || !entity || overspend}>
                 {closing ? 'Closing…' : 'Close Settlement'}
               </button>
             )}

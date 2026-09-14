@@ -61,6 +61,12 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'Finance & Budget',
   },
   {
+    id: 'actual-expense-lines',
+    title: 'Actual Expense Line Items',
+    description: 'Every settled expense line by activity — filter to one activity to see its line items and total actual spend.',
+    category: 'Finance & Budget',
+  },
+  {
     id: 'monthly-expense',
     title: 'Monthly Expense Report',
     description: 'Approved expense totals by calendar month.',
