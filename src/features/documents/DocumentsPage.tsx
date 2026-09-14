@@ -277,12 +277,16 @@ export function DocumentsPage() {
       )}
 
       {subTab === 'folders' && (
-        <div className="event-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {folders.map((folder) => (
-            <div key={folder.key} className="event-card" style={{ padding: 16, cursor: 'default' }}>
-              <h3 style={{ margin: '0 0 6px' }}>{folder.name}</h3>
-              <small style={{ color: 'var(--muted)' }}>{folder.total} document(s)</small>
-              <div style={{ marginTop: 10 }}>
+            <details key={folder.key} className="doc-folder">
+              <summary className="doc-folder-summary">
+                <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1, gap: 10 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14.5 }}>{folder.name}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 12 }}>{folder.total} document(s)</span>
+                </span>
+              </summary>
+              <div style={{ padding: '4px 16px 14px' }}>
                 {folder.sections.map((section) => (
                   <div key={section.label} style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', margin: '6px 0 4px' }}>
@@ -299,7 +303,7 @@ export function DocumentsPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </details>
           ))}
           {!folders.length && <div style={{ color: 'var(--muted)' }}>No documents uploaded yet.</div>}
         </div>

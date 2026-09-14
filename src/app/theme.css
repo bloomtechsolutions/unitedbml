@@ -403,6 +403,21 @@
   border: 1px dashed var(--ub-border); border-radius: var(--ub-radius); background: var(--ub-surface);
 }
 
+/* ---------- Collapsible document folders ---------- */
+.doc-folder { background: var(--ub-surface, #fff); border: 1px solid var(--ub-border, #dfe5eb); border-radius: 14px; overflow: hidden; }
+.doc-folder-summary {
+  display: flex; align-items: center; gap: 4px;
+  padding: 14px 16px; cursor: pointer; list-style: none;
+}
+.doc-folder-summary::-webkit-details-marker { display: none; }
+.doc-folder-summary::before {
+  content: '›'; display: inline-block; margin-right: 8px; font-size: 16px; font-weight: 700;
+  color: var(--ub-ink-faint, var(--muted)); transition: transform 0.15s ease; transform: rotate(0deg);
+}
+.doc-folder[open] .doc-folder-summary::before { transform: rotate(90deg); }
+.doc-folder-summary:hover { background: var(--ub-surface-2, #f6f7f9); }
+.doc-folder[open] .doc-folder-summary { border-bottom: 1px solid var(--ub-border-2, #eceef1); }
+
 /* ---------- Event Calendar ---------- */
 .ub-cal-month-chip {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
