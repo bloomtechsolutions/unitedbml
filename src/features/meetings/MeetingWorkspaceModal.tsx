@@ -10,7 +10,7 @@ import { AgendaFormModal } from './AgendaFormModal';
 import { ActionFormModal } from './ActionFormModal';
 import { DecisionFormModal } from './DecisionFormModal';
 import { buildMinutesHtml, printMeetingMinutes } from './minutes';
-import { isDueToday, isOverdue, meetingStatus } from './status';
+import { canCheckInToMeeting, isDueToday, isOverdue, meetingStatus } from './status';
 import { ATTENDANCE_STATUSES } from './types';
 import type { MeetingStatus, MeetingWithChildren } from './types';
 import {
@@ -367,11 +367,12 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
             const mine = meeting.attendees.find((a) => a.committee_id === myCommitteeId);
             if (!mine) return null;
             const alreadyIn = mine.attendance_status === 'Present';
+            const checkIn = canCheckInToMeeting(meeting);
             return (
               <div className={`ub-banner ${alreadyIn ? 'ub-banner-success' : 'ub-banner-accent'}`}>
                 {alreadyIn ? (
                   <>✓ You're checked in to this meeting.</>
-                ) : (
+                ) : checkIn.allowed ? (
                   <>
                     You're expected at this meeting.
                     <button
@@ -383,6 +384,8 @@ export function MeetingWorkspaceModal({ meeting, onClose, onEdit, onCancel, coor
                       {checkingIn ? 'Checking in…' : 'Check In'}
                     </button>
                   </>
+                ) : (
+                  <>You're expected at this meeting.{checkIn.reason ? ` ${checkIn.reason}` : ''}</>
                 )}
               </div>
             );

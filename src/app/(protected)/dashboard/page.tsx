@@ -8,6 +8,7 @@ import { useMyMeetings } from '../../../features/dashboard/useMyMeetings';
 import { useDashboard } from '../../../features/dashboard/useDashboard';
 import { markAllNotificationsRead, markNotificationRead, useNotifications } from '../../../features/notifications/useNotifications';
 import { checkInToMeeting } from '../../../features/meetings/useMeetings';
+import { canCheckInToMeeting } from '../../../features/meetings/status';
 
 function money(n: number): string {
   return `MVR ${Math.round(n).toLocaleString()}`;
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);
   const isToday = next?.meeting.meeting_date === today;
   const isMy = dash.view === 'My';
+  const checkIn = next ? canCheckInToMeeting(next.meeting) : { allowed: false, reason: null };
 
   const handleCheckIn = async (meetingId: string) => {
     setCheckingInId(meetingId);
@@ -120,10 +122,13 @@ export default function DashboardPage() {
                 {next.totalCheckedIn}/{next.totalExpected} checked in
               </div>
             </div>
-            {isToday && next.myAttendance?.attendance_status !== 'Present' && (
+            {next.myAttendance?.attendance_status !== 'Present' && checkIn.allowed && (
               <button className="ub-btn ub-btn-primary" onClick={() => void handleCheckIn(next.meeting.id)} disabled={checkingInId === next.meeting.id}>
                 {checkingInId === next.meeting.id ? 'Checking in…' : 'Check In'}
               </button>
+            )}
+            {next.myAttendance?.attendance_status !== 'Present' && !checkIn.allowed && checkIn.reason && (
+              <span className="ub-pill ub-pill-neutral">{checkIn.reason}</span>
             )}
             {next.myAttendance?.attendance_status === 'Present' && <span className="ub-pill ub-pill-success">✓ Checked in</span>}
           </div>

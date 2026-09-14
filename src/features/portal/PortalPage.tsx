@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
 import { checkInToMeeting } from '../meetings/useMeetings';
+import { canCheckInToMeeting } from '../meetings/status';
 import { useMyMeetings } from '../dashboard/useMyMeetings';
 import { leaderboardLevel } from '../leaderboard/types';
 import { useLeaderboard } from '../leaderboard/useLeaderboard';
@@ -152,8 +153,8 @@ export function PortalPage() {
             </div>
             {!meetingsLoading && !myMeetings.length && <p className="ub-empty">No upcoming meetings.</p>}
             {myMeetings.map((s) => {
-              const isToday = s.meeting.meeting_date === today;
               const checkedIn = s.myAttendance?.attendance_status === 'Present';
+              const checkIn = canCheckInToMeeting(s.meeting);
               return (
                 <div
                   key={s.meeting.id}
@@ -172,7 +173,7 @@ export function PortalPage() {
                       {s.meeting.meeting_date} · {s.meeting.meeting_time} · {s.meeting.location || 'Venue TBC'}
                     </div>
                   </Link>
-                  {isToday && !checkedIn && (
+                  {!checkedIn && checkIn.allowed && (
                     <button
                       className="ub-btn ub-btn-primary"
                       style={{ padding: '6px 12px', fontSize: 12 }}
@@ -181,6 +182,9 @@ export function PortalPage() {
                     >
                       {checkingInId === s.meeting.id ? 'Checking in…' : 'Check In'}
                     </button>
+                  )}
+                  {!checkedIn && !checkIn.allowed && checkIn.reason && (
+                    <small style={{ color: 'var(--ub-ink-faint)', whiteSpace: 'nowrap' }}>{checkIn.reason}</small>
                   )}
                   {checkedIn && <span className="ub-pill ub-pill-success">✓ Checked in</span>}
                 </div>
