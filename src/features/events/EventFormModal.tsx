@@ -3,18 +3,16 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import type { EventRow } from '../../types/database';
-import { EVENT_AUDIENCE_OPTIONS, type CommitteeMemberOption } from './types';
+import { EVENT_SCOPE_OPTIONS, type CommitteeMemberOption } from './types';
 import { localTodayIso } from './lifecycle';
 
 interface EventFormValues {
   name: string;
   event_type: string;
-  audience_type: (typeof EVENT_AUDIENCE_OPTIONS)[number];
+  event_scope: (typeof EVENT_SCOPE_OPTIONS)[number];
   event_date: string;
   event_time: string;
-  venue: string;
   coordinator_id: string;
-  expected_participants: number;
   planned_budget: number;
   description: string;
 }
@@ -22,12 +20,10 @@ interface EventFormValues {
 const EMPTY: EventFormValues = {
   name: '',
   event_type: '',
-  audience_type: 'ALL_STAFF',
+  event_scope: 'Internal',
   event_date: localTodayIso(),
   event_time: '08:00',
-  venue: '',
   coordinator_id: '',
-  expected_participants: 0,
   planned_budget: 0,
   description: '',
 };
@@ -52,12 +48,10 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
       setValues({
         name: editing.name,
         event_type: editing.event_type ?? '',
-        audience_type: 'ALL_STAFF',
+        event_scope: (editing.event_scope as EventFormValues['event_scope']) ?? 'Internal',
         event_date: editing.event_date ?? localTodayIso(),
         event_time: editing.event_time ?? '08:00',
-        venue: editing.venue ?? '',
         coordinator_id: editing.coordinator_committee_id ?? '',
-        expected_participants: editing.expected_participants,
         planned_budget: editing.planned_budget,
         description: editing.description ?? '',
       });
@@ -83,13 +77,12 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
       await onSave({
         name: values.name.trim(),
         event_type: values.event_type || null,
+        event_scope: values.event_scope,
         event_date: values.event_date || null,
         event_time: values.event_time || null,
-        venue: values.venue || null,
         coordinator: coordinator?.name ?? null,
         coordinator_role: coordinator?.role ?? null,
         coordinator_committee_id: coordinator?.id ?? null,
-        expected_participants: Number(values.expected_participants) || 0,
         planned_budget: Number(values.planned_budget) || 0,
         description: values.description || null,
         status: editing?.status ?? 'Planning',
@@ -124,16 +117,14 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
           </select>
         </div>
         <div className="field">
-          <label>Audience</label>
+          <label>Event Scope</label>
           <select
-            value={values.audience_type}
-            onChange={(e) =>
-              setValues((v) => ({ ...v, audience_type: e.target.value as EventFormValues['audience_type'] }))
-            }
+            value={values.event_scope}
+            onChange={(e) => setValues((v) => ({ ...v, event_scope: e.target.value as EventFormValues['event_scope'] }))}
           >
-            {EVENT_AUDIENCE_OPTIONS.map((a) => (
-              <option key={a} value={a}>
-                {a.replace('_', ' ')}
+            {EVENT_SCOPE_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
               </option>
             ))}
           </select>
@@ -155,10 +146,6 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
           />
         </div>
         <div className="field">
-          <label>Venue</label>
-          <input value={values.venue} onChange={(e) => setValues((v) => ({ ...v, venue: e.target.value }))} />
-        </div>
-        <div className="field">
           <label>Coordinator</label>
           <select
             value={values.coordinator_id}
@@ -171,15 +158,6 @@ export function EventFormModal({ open, onClose, onSave, eventTypes, coordinators
               </option>
             ))}
           </select>
-        </div>
-        <div className="field">
-          <label>Expected Participants</label>
-          <input
-            type="number"
-            min={0}
-            value={values.expected_participants}
-            onChange={(e) => setValues((v) => ({ ...v, expected_participants: Number(e.target.value) }))}
-          />
         </div>
         <div className="field">
           <label>Planned Budget</label>

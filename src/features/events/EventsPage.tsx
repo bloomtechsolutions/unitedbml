@@ -194,7 +194,10 @@ export function EventsPage() {
             {filtered.map(({ event, lifecycle, prep }) => (
               <div key={event.id} className="event-card" onClick={() => setDetailId(event.id)}>
                 <div style={{ padding: 16 }}>
-                  <div className="pill plan">{event.event_type || 'General'}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <div className="pill plan">{event.event_type || 'General'}</div>
+                    {event.event_scope === 'External' && <div className="pill">External</div>}
+                  </div>
                   <h3 style={{ margin: '10px 0 4px' }}>{event.name}</h3>
                   <small style={{ color: 'var(--muted)' }}>
                     {event.event_date || 'No date'} · {event.venue || 'No venue'}

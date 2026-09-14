@@ -66,6 +66,7 @@ export interface EventRow {
   id: string;
   name: string;
   event_type: string | null;
+  event_scope: string | null;
   status: string | null;
   auto_status: string | null;
   manual_state: string | null;

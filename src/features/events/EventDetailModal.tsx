@@ -199,7 +199,7 @@ export function EventDetailModal({ event, onClose, onEdit, onArchive, onCancel, 
         }}
       >
         <div style={{ fontSize: 12.5, opacity: 0.85 }}>
-          {event.event_type || 'Event'} · {lifecycle}
+          {event.event_type || 'Event'} · {event.event_scope || 'Internal'} · {lifecycle}
         </div>
         <h2 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0' }}>{event.name}</h2>
         <div style={{ fontSize: 13, opacity: 0.9, display: 'flex', gap: 14, flexWrap: 'wrap' }}>

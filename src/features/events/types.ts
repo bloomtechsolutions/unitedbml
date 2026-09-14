@@ -20,6 +20,6 @@ export interface StaffOption {
   department?: string | null;
 }
 
-export const EVENT_AUDIENCE_OPTIONS = ['ALL_STAFF', 'MALE_BASED', 'ATOLL_BASED'] as const;
+export const EVENT_SCOPE_OPTIONS = ['Internal', 'External'] as const;
 
 export const TASK_PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'] as const;
