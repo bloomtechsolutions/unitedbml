@@ -310,7 +310,7 @@
 .ub-table tr.ub-row-due td:first-child { border-left: 3px solid var(--ub-warning); }
 
 /* Step tracker (approval chains, lifecycle stages) */
-.ub-track { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
+.ub-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .ub-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
 .ub-step:before { content: ''; position: absolute; height: 2px; background: var(--ub-border); left: -50%; right: 50%; top: 14px; }
 .ub-step:first-child:before { display: none; }
