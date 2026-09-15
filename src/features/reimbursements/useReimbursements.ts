@@ -159,8 +159,9 @@ export async function sendProcurementGroupEmail(group: ProcurementGroupCase, act
   const note = await generateApprovedExpenseNotePdf(group.expense_request_id!);
 
   const html = outlookEmailTemplate({
-    heading: 'Reimbursement Pre-Approval Request',
-    intro: 'Dear Sir, please review the following reimbursement pre-approval request and place it for your approval to proceed.',
+    heading: '',
+    bannerSuffix: 'Procurement Pre-Approval',
+    intro: 'Dear Team,<br/>Please review the following reimbursement pre-approval request and place it for your approval to proceed.',
     rows: [
       { label: 'Expense Request', value: `${group.expense_request_number ?? ''}` },
       { label: 'Event / Activity', value: group.event_name || 'General (no linked event)' },
@@ -172,6 +173,7 @@ export async function sendProcurementGroupEmail(group: ProcurementGroupCase, act
     totalLabel: 'Total Amount',
     totalValue: `MVR ${total.toLocaleString()}`,
     advisory,
+    note: 'Please find attached the Expense Approval Note for your review and approval.',
     signatureName: actorName,
     signatureRole: actorRole,
     signatureEmail: actorEmail,
