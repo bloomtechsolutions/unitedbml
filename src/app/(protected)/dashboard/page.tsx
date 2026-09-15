@@ -9,6 +9,7 @@ import { markAllNotificationsRead, markNotificationRead, useNotifications } from
 import { checkInToMeeting } from '../../../features/meetings/useMeetings';
 import { canCheckInToMeeting } from '../../../features/meetings/status';
 import { StaffDashboardPage } from '../../../features/portal/StaffDashboardPage';
+import { RequestDetailModal } from '../../../features/finance/RequestDetailModal';
 import { useToast } from '../../../lib/ToastContext';
 
 function money(n: number): string {
@@ -48,6 +49,8 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
   const toast = useToast();
 
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
+  const detailRequest = detailRequestId ? dash.requests.find((r) => r.id === detailRequestId) ?? null : null;
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
 
   const next = summaries[0] ?? null;
@@ -190,28 +193,40 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
               </p>
             </div>
             {!dash.loading && !dash.priorityWork.length && <p className="ub-empty">No high-priority exceptions are currently open.</p>}
-            {dash.priorityWork.map((item) => (
-              <Link
-                key={item.key}
-                href={item.href}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '9px 4px',
-                  borderBottom: '1px solid var(--ub-border-2)',
-                  textDecoration: 'none',
-                  color: 'inherit',
-                }}
-              >
-                <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: item.level === 'danger' ? 'var(--ub-danger)' : 'var(--ub-border)' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{item.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>{item.detail}</div>
-                </div>
-                <span className={`ub-pill ${item.level === 'danger' ? 'ub-pill-danger' : 'ub-pill-neutral'}`}>{item.status}</span>
-              </Link>
-            ))}
+            {dash.priorityWork.map((item) => {
+              const rowStyle = {
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '9px 4px',
+                borderBottom: '1px solid var(--ub-border-2)',
+                textDecoration: 'none',
+                color: 'inherit',
+              } as const;
+              const rowContent = (
+                <>
+                  <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: item.level === 'danger' ? 'var(--ub-danger)' : 'var(--ub-border)' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{item.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>{item.detail}</div>
+                  </div>
+                  <span className={`ub-pill ${item.level === 'danger' ? 'ub-pill-danger' : 'ub-pill-neutral'}`}>{item.status}</span>
+                </>
+              );
+              return item.requestId ? (
+                <button
+                  key={item.key}
+                  onClick={() => setDetailRequestId(item.requestId!)}
+                  style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}
+                >
+                  {rowContent}
+                </button>
+              ) : (
+                <Link key={item.key} href={item.href} style={rowStyle}>
+                  {rowContent}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="ub-card">
@@ -307,6 +322,8 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
           </div>
         </div>
       </div>
+
+      <RequestDetailModal request={detailRequest} onClose={() => setDetailRequestId(null)} onRefresh={dash.reloadRequests} />
     </div>
   );
 }

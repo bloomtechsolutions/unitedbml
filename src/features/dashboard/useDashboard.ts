@@ -25,6 +25,9 @@ export interface PriorityItem {
   detail: string;
   status: string;
   href: string;
+  /** Set for pending expense-request items — clicking opens RequestDetailModal in place
+   * instead of navigating to Finance, so an approver can act without leaving the Dashboard. */
+  requestId?: string;
 }
 
 export interface RecentItem {
@@ -50,7 +53,7 @@ export function useDashboard(_profile: Profile | null) {
   const { events, loading: eventsLoading } = useEvents();
   const { meetings, loading: meetingsLoading } = useMeetings();
   const { budget, loading: budgetLoading } = useBudget();
-  const { requests, loading: requestsLoading } = useExpenseRequests();
+  const { requests, loading: requestsLoading, reload: reloadRequests } = useExpenseRequests();
   const { cases: reimbursementCases, batches: apBatches, loading: reimbLoading } = useReimbursementCases();
 
   const [agendaRange, setAgendaRange] = useState<7 | 30>(7);
@@ -151,6 +154,7 @@ export function useDashboard(_profile: Profile | null) {
         detail: `${r.request_number ?? ''} · ${r.status} · MVR ${(r.total_amount ?? 0).toLocaleString()}`,
         status: 'Approval',
         href: `/finance`,
+        requestId: r.id,
       });
     }
     for (const c of openReimbursements) {
@@ -218,5 +222,7 @@ export function useDashboard(_profile: Profile | null) {
     recentActivity,
     financeSnapshot,
     meetingStatusOf: meetingStatus,
+    requests,
+    reloadRequests,
   };
 }
