@@ -189,7 +189,7 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
             <div>
               <h3 style={{ fontSize: 15, fontWeight: 700 }}>Priority Work</h3>
               <p style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', marginTop: 2, marginBottom: 14 }}>
-                Tasks, approvals and exceptions needing action.
+                Tasks and approvals assigned to you.
               </p>
             </div>
             {!dash.loading && !dash.priorityWork.length && <p className="ub-empty">No high-priority exceptions are currently open.</p>}
@@ -210,7 +210,11 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
                     <div style={{ fontSize: 13.5, fontWeight: 700 }}>{item.title}</div>
                     <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>{item.detail}</div>
                   </div>
-                  <span className={`ub-pill ${item.level === 'danger' ? 'ub-pill-danger' : 'ub-pill-neutral'}`}>{item.status}</span>
+                  <span
+                    className={`ub-pill ${item.requestId ? 'ub-pill-accent' : item.level === 'danger' ? 'ub-pill-danger' : 'ub-pill-neutral'}`}
+                  >
+                    {item.status}
+                  </span>
                 </>
               );
               return item.requestId ? (

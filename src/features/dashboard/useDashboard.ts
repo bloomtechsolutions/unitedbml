@@ -49,7 +49,7 @@ function relativeDay(iso: string): string {
   return iso;
 }
 
-export function useDashboard(_profile: Profile | null) {
+export function useDashboard(profile: Profile | null) {
   const { events, loading: eventsLoading } = useEvents();
   const { meetings, loading: meetingsLoading } = useMeetings();
   const { budget, loading: budgetLoading } = useBudget();
@@ -74,10 +74,37 @@ export function useDashboard(_profile: Profile | null) {
   const openTasks = useMemo(() => events.flatMap((e) => e.tasks.filter((t) => !t.done)), [events]);
   const overdueTasks = useMemo(() => openTasks.filter((t) => t.due_date && t.due_date < today), [openTasks, today]);
 
+  const myName = (profile?.full_name || '').trim().toLowerCase();
+  const isPresident = profile?.role === 'President';
+  const myOverdueTasks = useMemo(
+    () => overdueTasks.filter((t) => myName && (t.owner || '').trim().toLowerCase() === myName),
+    [overdueTasks, myName]
+  );
+  const myOpenTasks = useMemo(
+    () => openTasks.filter((t) => t.due_date && t.due_date >= today && myName && (t.owner || '').trim().toLowerCase() === myName),
+    [openTasks, today, myName]
+  );
+
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === 'Pending President Recommendation' || r.status === 'Pending Final Approval'),
     [requests]
   );
+
+  // Requests where the logged-in user is the actual next actor — the President at the
+  // recommendation stage, or the specific person picked as final approver — mirroring the same
+  // gating RequestDetailModal uses for showing its Approve/Reject buttons.
+  const myApprovalRequests = useMemo(() => {
+    const actorEmail = (profile?.email || '').toLowerCase().trim();
+    const actorName = (profile?.full_name || '').toLowerCase().trim();
+    return pendingRequests.filter((r) => {
+      if (r.status === 'Pending President Recommendation') return isPresident;
+      if (r.status === 'Pending Final Approval') {
+        const selectedEmail = (r.final_approver_email || '').toLowerCase().trim();
+        return selectedEmail ? actorEmail === selectedEmail : (r.final_approver_name || '').toLowerCase().trim() === actorName;
+      }
+      return false;
+    });
+  }, [pendingRequests, isPresident, profile]);
 
   const openReimbursements = useMemo(
     () =>
@@ -88,6 +115,15 @@ export function useDashboard(_profile: Profile | null) {
       }),
     [reimbursementCases, apBatches]
   );
+
+  const myOpenReimbursements = useMemo(() => {
+    const myId = profile?.id;
+    return openReimbursements.filter((c) => {
+      const event = c.event_id ? events.find((e) => e.id === c.event_id) : null;
+      if (myId && event?.reimbursement_manager_user_id === myId) return true;
+      return myName && (c.requested_by || '').trim().toLowerCase() === myName;
+    });
+  }, [openReimbursements, events, profile, myName]);
 
   const spend = approvedSpend(requests);
   const { total: standingAllocationsActual } = useStandingAllocationsActual(new Date().getFullYear());
@@ -126,38 +162,38 @@ export function useDashboard(_profile: Profile | null) {
 
   const priorityWork = useMemo<PriorityItem[]>(() => {
     const rows: PriorityItem[] = [];
-    for (const t of overdueTasks) {
+    for (const t of myOverdueTasks) {
       rows.push({
         key: `task-${t.id}`,
         level: 'danger',
         title: t.task_text,
-        detail: `Event task${t.owner ? ` · ${t.owner}` : ''} · ${relativeDay(t.due_date!)}`,
+        detail: `Event task · ${relativeDay(t.due_date!)}`,
         status: 'Overdue',
         href: `/events`,
       });
     }
-    for (const t of openTasks.filter((t) => t.due_date && t.due_date >= today)) {
+    for (const t of myOpenTasks) {
       rows.push({
         key: `task-due-${t.id}`,
         level: 'normal',
         title: t.task_text,
-        detail: `Event task${t.owner ? ` · ${t.owner}` : ''} · ${relativeDay(t.due_date!)}`,
+        detail: `Event task · ${relativeDay(t.due_date!)}`,
         status: 'Task',
         href: `/events`,
       });
     }
-    for (const r of pendingRequests) {
+    for (const r of myApprovalRequests) {
       rows.push({
         key: `finance-${r.id}`,
         level: 'normal',
         title: r.title || r.request_number || 'Expense request',
         detail: `${r.request_number ?? ''} · ${r.status} · MVR ${(r.total_amount ?? 0).toLocaleString()}`,
-        status: 'Approval',
+        status: 'Click to Approve',
         href: `/finance`,
         requestId: r.id,
       });
     }
-    for (const c of openReimbursements) {
+    for (const c of myOpenReimbursements) {
       rows.push({
         key: `reimb-${c.id}`,
         level: 'normal',
@@ -168,7 +204,7 @@ export function useDashboard(_profile: Profile | null) {
       });
     }
     return rows.sort((a, b) => (a.level === b.level ? 0 : a.level === 'danger' ? -1 : 1)).slice(0, 10);
-  }, [overdueTasks, openTasks, pendingRequests, openReimbursements, today]);
+  }, [myOverdueTasks, myOpenTasks, myApprovalRequests, myOpenReimbursements]);
 
   const recentActivity = useMemo<RecentItem[]>(() => {
     const rows: RecentItem[] = [];
