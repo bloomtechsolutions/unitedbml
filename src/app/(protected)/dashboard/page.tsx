@@ -224,26 +224,13 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
                 Finance →
               </Link>
             </div>
-            <div className="ub-kpi-strip" style={{ margin: 0, gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="ub-kpi-strip" style={{ margin: 0 }}>
               {[
                 { label: 'Annual budget', value: money(dash.financeSnapshot.annualBudget) },
                 { label: 'Available', value: money(dash.financeSnapshot.available) },
                 { label: 'Approved spend', value: money(dash.financeSnapshot.approvedSpend) },
-                { label: 'Pending value', value: money(dash.financeSnapshot.pendingValue) },
-                { label: 'Pending requests', value: dash.financeSnapshot.pendingCount },
-                { label: 'Reimbursements', value: dash.financeSnapshot.openReimbursements },
-              ].map((m, i) => (
-                <div
-                  className="ub-kpi-strip-item"
-                  key={m.label}
-                  style={{
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: 2,
-                    borderRight: (i + 1) % 3 === 0 ? 'none' : undefined,
-                    borderTop: i >= 3 ? '1px solid var(--ub-border)' : undefined,
-                  }}
-                >
+              ].map((m) => (
+                <div className="ub-kpi-strip-item" key={m.label} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
                   <span className="ub-kpi-strip-value">{m.value}</span>
                   <span className="ub-kpi-strip-label" style={{ whiteSpace: 'normal', overflow: 'visible' }}>
                     {m.label}
