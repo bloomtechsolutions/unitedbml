@@ -71,3 +71,46 @@ export async function clearMyCommitteeLeave() {
   const { error } = await supabase.rpc('clear_my_committee_leave');
   if (error) throw error;
 }
+
+export function useCalendarFeedToken() {
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      setToken(null);
+      setLoading(false);
+      return;
+    }
+    const { data: existing } = await supabase.from('calendar_feed_tokens').select('token').eq('user_id', userId).maybeSingle();
+    if (existing) {
+      setToken(existing.token);
+      setLoading(false);
+      return;
+    }
+    const { data: created } = await supabase
+      .from('calendar_feed_tokens')
+      .insert({ user_id: userId })
+      .select('token')
+      .single();
+    setToken(created?.token ?? null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { token, loading, reload };
+}
+
+export async function regenerateCalendarFeedToken() {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) throw new Error('Not signed in.');
+  const { error } = await supabase.from('calendar_feed_tokens').update({ token: crypto.randomUUID() }).eq('user_id', userId);
+  if (error) throw error;
+}

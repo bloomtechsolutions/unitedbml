@@ -6,9 +6,11 @@ import { useToast } from '../../lib/ToastContext';
 import {
   changeMyPassword,
   clearMyCommitteeLeave,
+  regenerateCalendarFeedToken,
   signOutOtherSessions,
   updateMyCommitteeLeave,
   updateMyProfile,
+  useCalendarFeedToken,
   useMyCommitteeLeave,
 } from './useSettings';
 
@@ -34,7 +36,25 @@ function passwordStrength(pw: string): number {
 export function SettingsPage() {
   const { profile, session, signOut, refreshProfile } = useAuth();
   const { leave, loading: leaveLoading, reload: reloadLeave } = useMyCommitteeLeave();
+  const { token: feedToken, loading: feedTokenLoading, reload: reloadFeedToken } = useCalendarFeedToken();
+  const [regeneratingToken, setRegeneratingToken] = useState(false);
   const toast = useToast();
+
+  const feedUrl = feedToken && typeof window !== 'undefined' ? `${window.location.origin}/api/meetings-feed?token=${feedToken}` : '';
+
+  const handleRegenerateFeedToken = async () => {
+    if (!confirm('Regenerate your calendar feed link? The old link will stop working.')) return;
+    setRegeneratingToken(true);
+    try {
+      await regenerateCalendarFeedToken();
+      await reloadFeedToken();
+      toast('Feed link regenerated');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to regenerate feed link.');
+    } finally {
+      setRegeneratingToken(false);
+    }
+  };
 
   const [fullName, setFullName] = useState('');
   const [memberUid, setMemberUid] = useState('');
@@ -234,6 +254,44 @@ export function SettingsPage() {
                 {savingProfile ? 'Saving…' : 'Save Profile'}
               </button>
             </div>
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-section-head">
+              <div>
+                <h3>Calendar Sync</h3>
+                <p>Subscribe Outlook (or Google Calendar) to a live feed of UnitedBML meetings — it refreshes automatically every few hours.</p>
+              </div>
+            </div>
+            {feedTokenLoading || !feedToken ? (
+              <p style={{ color: 'var(--muted)' }}>Loading your feed link…</p>
+            ) : (
+              <>
+                <div className="settings-form">
+                  <div className="full">
+                    <label>Feed Link</label>
+                    <input readOnly value={feedUrl} onFocus={(e) => e.target.select()} />
+                  </div>
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  In Outlook: Add calendar → Subscribe from web, and paste this link. In Google Calendar: Other calendars → From URL.
+                </p>
+                <div className="settings-actions">
+                  <button
+                    className="btn ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText(feedUrl);
+                      toast('Feed link copied');
+                    }}
+                  >
+                    Copy Link
+                  </button>
+                  <button className="btn ghost" onClick={() => void handleRegenerateFeedToken()} disabled={regeneratingToken}>
+                    {regeneratingToken ? 'Regenerating…' : 'Regenerate Link'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {!leaveLoading && leave?.isCommitteeMember && (

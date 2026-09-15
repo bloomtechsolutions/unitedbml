@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
+import { buildIcsCalendar, buildIcsEvent, downloadIcsFile } from '../../lib/ics';
 import { useToast } from '../../lib/ToastContext';
 import { useCommitteeMembers } from '../events/useEvents';
 import type { MeetingActionRow, MeetingRow } from '../../types/database';
@@ -38,6 +39,10 @@ const MEETINGS_INFO = [
   {
     q: 'What is the Decision Register?',
     a: 'The formal record of what was decided in each meeting, kept for reference and audit.',
+  },
+  {
+    q: 'Can I sync meetings to Outlook?',
+    a: 'Yes — Add to Outlook on any meeting downloads a single .ics invite. For all meetings kept in sync automatically, go to Settings → Calendar Sync and subscribe Outlook or Google Calendar to your personal feed link.',
   },
 ];
 
@@ -137,6 +142,22 @@ export function MeetingsPage() {
     await saveAction({ ...action, status, done: status === 'Completed' }, meeting);
     await recordActionHistory({ meeting_action_id: action.id, action: 'status_change', old_status: action.status, new_status: status });
     await reload();
+  };
+
+  const handleAddToOutlook = (meeting: MeetingWithChildren) => {
+    if (!meeting.meeting_date) {
+      toast('This meeting has no date set yet.');
+      return;
+    }
+    const vevent = buildIcsEvent({
+      uid: `meeting-${meeting.id}@unitedbml`,
+      date: meeting.meeting_date,
+      time: meeting.meeting_time,
+      title: meeting.title,
+      location: meeting.location,
+      description: meeting.purpose,
+    });
+    downloadIcsFile(`${meeting.title.replace(/[^a-zA-Z0-9]+/g, '-')}.ics`, buildIcsCalendar([vevent], meeting.title));
   };
 
   if (loading) return <div>Loading meetings…</div>;
@@ -239,6 +260,7 @@ export function MeetingsPage() {
                 <th>Time</th>
                 <th>Location</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -251,11 +273,23 @@ export function MeetingsPage() {
                   <td>
                     <span className={`ub-pill ${STATUS_PILL[status]}`}>{status}</span>
                   </td>
+                  <td>
+                    <button
+                      className="ub-btn ub-btn-ghost"
+                      style={{ padding: '4px 10px', fontSize: 12 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToOutlook(meeting);
+                      }}
+                    >
+                      Add to Outlook
+                    </button>
+                  </td>
                 </tr>
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--ub-ink-faint)' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ub-ink-faint)' }}>
                     No meetings match your filters.
                   </td>
                 </tr>

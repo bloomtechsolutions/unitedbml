@@ -951,8 +951,19 @@ export interface Database {
         Insert: Partial<EventReportPhotoRow>;
         Update: Partial<EventReportPhotoRow>;
       };
+      calendar_feed_tokens: {
+        Row: CalendarFeedTokenRow;
+        Insert: Partial<CalendarFeedTokenRow>;
+        Update: Partial<CalendarFeedTokenRow>;
+      };
     };
   };
+}
+
+export interface CalendarFeedTokenRow {
+  user_id: string;
+  token: string;
+  created_at: string;
 }
 
 export interface PlannedActivityRow {
