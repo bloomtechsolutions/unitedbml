@@ -202,7 +202,8 @@ export function RequestDetailModal({ request, onClose, onRefresh }: Props) {
       )}
 
       <div className="modal-actions">
-        {(request.status === 'Pending President Recommendation' || request.status === 'Pending Final Approval') && (
+        {((request.status === 'Pending President Recommendation' && !isPresident) ||
+          (request.status === 'Pending Final Approval' && !isSelectedFinalApprover)) && (
           <button className="btn ghost" disabled={busy} onClick={() => void handleResendEmail()}>
             Resend Approval Email
           </button>
