@@ -131,7 +131,7 @@ function ExecutiveDashboardPage({ profile, session }: { profile: ReturnType<type
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
               <div>
                 <h3 style={{ fontSize: 15, fontWeight: 700 }}>Agenda</h3>
-                <p style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', marginTop: 2 }}>Today and the days ahead, without the calendar clutter.</p>
+                <p style={{ fontSize: 12.5, color: 'var(--ub-ink-faint)', marginTop: 2 }}>Today and the days ahead.</p>
               </div>
               <div className="ub-tabs" style={{ margin: 0 }}>
                 <button className={`ub-tab ${dash.agendaRange === 7 ? 'active' : ''}`} onClick={() => dash.setAgendaRange(7)}>
