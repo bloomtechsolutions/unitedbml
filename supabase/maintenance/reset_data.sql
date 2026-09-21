@@ -6,11 +6,14 @@
 --
 -- What this does NOT do:
 --  - It does not touch auth.users, committee_members, or profiles.
+--  - It does not touch public_holidays (committee-maintained reference calendar, not user
+--    data) or calendar_feed_tokens (per-user Outlook/Google subscription secrets — clearing
+--    it would silently break everyone's already-added calendar subscriptions for no benefit).
 --  - It does not delete files already uploaded to Supabase Storage (receipts, evidence,
---    documents). Their DB rows (document_registry, attachments, bill/procurement
---    attachment paths) are cleared, but the objects themselves stay in the bucket —
---    empty the relevant Storage buckets separately from the dashboard if you want those
---    gone too.
+--    documents, event report photos). Their DB rows (document_registry, attachments,
+--    bill/procurement attachment paths, event_report_photos) are cleared, but the objects
+--    themselves stay in the bucket — empty the relevant Storage buckets separately from the
+--    dashboard if you want those gone too.
 --  - app_settings, event_types and vendor_master are reference/config tables rather than
 --    transactional history — they're wiped along with everything else per "clear all the
 --    tables", but you'll need to reseed them (or restore from your own backup) if you
@@ -35,7 +38,10 @@ truncate table
   public.email_log,
   public.event_actual_expenses,
   public.event_attendance,
+  public.event_planned_activities,
   public.event_registrations,
+  public.event_report_photos,
+  public.event_reports,
   public.event_task_history,
   public.event_tasks,
   public.event_team_messages,
