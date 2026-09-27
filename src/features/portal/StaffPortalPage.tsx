@@ -9,7 +9,7 @@ import type { ApBatchWithBills, ProcurementGroupCase } from '../reimbursements/t
 import { batchesForCase, draftBatchForCase, useStaffReimbursementWorkspace, type ManagedEventSummary } from './useStaffReimbursements';
 
 function money(n: number): string {
-  return `MVR ${Math.round(n).toLocaleString()}`;
+  return `MVR ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function batchStatusInfo(batch: ApBatchWithBills): { label: string; pillClass: string } {

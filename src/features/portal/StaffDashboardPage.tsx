@@ -5,7 +5,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { useStaffReimbursementWorkspace } from './useStaffReimbursements';
 
 function money(n: number): string {
-  return `MVR ${Math.round(n).toLocaleString()}`;
+  return `MVR ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function greeting(): string {
