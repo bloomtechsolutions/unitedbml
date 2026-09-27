@@ -1,29 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { useToast } from '../../lib/ToastContext';
-import type { VendorMasterRow } from '../../types/database';
 import { ApBatchModal } from './ApBatchModal';
 import { ApStatusModal } from './ApStatusModal';
 import { ExceptionModal } from './ExceptionModal';
 import { ProcurementGroupModal } from './ProcurementGroupModal';
 import { ProcurementResponseModal } from './ProcurementResponseModal';
 import { ReviewApBatchModal } from './ReviewApBatchModal';
-import { VendorFormModal } from './VendorFormModal';
-import { VendorImportModal } from './VendorImportModal';
 import type { ApBatchWithBills, EligibleExpenseLine, EligibleExpenseRequest, ProcurementGroupCase } from './types';
-import {
-  apSubmittedTotal,
-  deleteVendor,
-  sendProcurementGroupEmail,
-  useEligibleExpenseRequests,
-  useReimbursementCases,
-  useVendorMaster,
-} from './useReimbursements';
+import { apSubmittedTotal, sendProcurementGroupEmail, useEligibleExpenseRequests, useReimbursementCases } from './useReimbursements';
 
-type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'vendors' | 'info';
+type SubTab = 'cases' | 'procurement' | 'ap' | 'exceptions' | 'info';
 
 const REIMBURSEMENTS_INFO = [
   {
@@ -51,22 +41,15 @@ const REIMBURSEMENTS_INFO = [
     a: "For an expense item that was already paid, or genuinely doesn't need Procurement pre-approval. Recording one moves the case straight to Exception Recorded, skipping the Procurement tab.",
   },
   {
-    q: 'What are Vendors?',
-    a: 'The payee directory bills are raised against — account details and status. Only Treasurer, President, Chairperson, Vice Chairperson or Secretary can add or edit vendor records.',
+    q: 'Where do I manage Vendors?',
+    a: 'Vendors have their own page now — Finance → Vendors — with add/edit/remove and bulk CSV/Excel import.',
   },
 ];
-
-const VENDOR_MANAGER_ROLES = ['treasurer', 'president', 'chairperson', 'vice chairperson', 'vice_chairperson', 'secretary'];
-
-function canManageVendors(role: string | undefined): boolean {
-  return !!role && VENDOR_MANAGER_ROLES.includes(role.trim().toLowerCase());
-}
 
 export function ReimbursementsPage() {
   const { profile } = useAuth();
   const { cases, batches, loading, error, reload } = useReimbursementCases();
   const { eligible, loading: eligibleLoading } = useEligibleExpenseRequests(cases);
-  const { vendors, loading: vendorsLoading, reload: reloadVendors } = useVendorMaster();
   const toast = useToast();
 
   const [subTab, setSubTab] = useState<SubTab>('cases');
@@ -78,20 +61,6 @@ export function ReimbursementsPage() {
   const [batchCase, setBatchCase] = useState<ProcurementGroupCase | null>(null);
   const [editingBatch, setEditingBatch] = useState<ApBatchWithBills | null>(null);
   const [statusBatch, setStatusBatch] = useState<ApBatchWithBills | null>(null);
-  const [vendorFormOpen, setVendorFormOpen] = useState(false);
-  const [editingVendor, setEditingVendor] = useState<VendorMasterRow | null>(null);
-  const [vendorImportOpen, setVendorImportOpen] = useState(false);
-  const [vendorSearch, setVendorSearch] = useState('');
-
-  const canManageVendorMaster = canManageVendors(profile?.role);
-  const filteredVendors = useMemo(
-    () =>
-      vendors.filter((v) => {
-        const q = vendorSearch.toLowerCase();
-        return !q || v.name.toLowerCase().includes(q) || v.vendor_account.toLowerCase().includes(q) || (v.worker_id || '').toLowerCase().includes(q);
-      }),
-    [vendors, vendorSearch]
-  );
 
   const groups = cases.filter((c) => c.data?.isProcurementGroup);
   const lineCases = cases.filter((c) => !c.data?.isProcurementGroup);
@@ -168,9 +137,6 @@ export function ReimbursementsPage() {
         </button>
         <button className={`tab ${subTab === 'exceptions' ? 'active' : ''}`} onClick={() => setSubTab('exceptions')}>
           Exceptions ({exceptions.length})
-        </button>
-        <button className={`tab ${subTab === 'vendors' ? 'active' : ''}`} onClick={() => setSubTab('vendors')}>
-          Vendors ({vendors.length})
         </button>
         <button className={`tab ${subTab === 'info' ? 'active' : ''}`} onClick={() => setSubTab('info')}>
           Info
@@ -447,98 +413,6 @@ export function ReimbursementsPage() {
         </table>
       )}
 
-      {subTab === 'vendors' && (
-        <div>
-          <div className="toolbar">
-            <div className="filters">
-              <input
-                placeholder="Search vendor, account, worker ID…"
-                value={vendorSearch}
-                onChange={(e) => setVendorSearch(e.target.value)}
-              />
-            </div>
-            {canManageVendorMaster && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn ghost" onClick={() => setVendorImportOpen(true)}>
-                  Bulk Import (CSV/Excel)
-                </button>
-                <button
-                  className="btn primary"
-                  onClick={() => {
-                    setEditingVendor(null);
-                    setVendorFormOpen(true);
-                  }}
-                >
-                  + Add Vendor
-                </button>
-              </div>
-            )}
-          </div>
-          {!canManageVendorMaster && (
-            <p style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Vendors are the staff/payees used when submitting AP bills. Only Treasurer, President,
-              Chairperson, Vice Chairperson or Secretary can add or edit vendors.
-            </p>
-          )}
-          {vendorsLoading ? (
-            <div>Loading vendors…</div>
-          ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Vendor Account</th>
-                  <th>Name</th>
-                  <th>Worker ID</th>
-                  <th>Status</th>
-                  {canManageVendorMaster && <th />}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredVendors.map((v) => (
-                  <tr key={v.vendor_account}>
-                    <td>{v.vendor_account}</td>
-                    <td>{v.name}</td>
-                    <td>{v.worker_id || '—'}</td>
-                    <td>
-                      <span className={`pill ${v.status === 'Inactive' ? 'cancel' : 'open'}`}>{v.status}</span>
-                    </td>
-                    {canManageVendorMaster && (
-                      <td style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          className="btn ghost"
-                          onClick={() => {
-                            setEditingVendor(v);
-                            setVendorFormOpen(true);
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="btn danger"
-                          onClick={() => {
-                            if (!confirm(`Remove vendor "${v.name}"?`)) return;
-                            void deleteVendor(v.vendor_account).then(reloadVendors);
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {!filteredVendors.length && (
-                  <tr>
-                    <td colSpan={canManageVendorMaster ? 5 : 4} style={{ textAlign: 'center', color: 'var(--muted)' }}>
-                      No vendors match your search.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
       <ProcurementGroupModal
         request={groupTarget}
         onClose={() => setGroupTarget(null)}
@@ -589,20 +463,6 @@ export function ReimbursementsPage() {
         caseItem={reviewBatch ? cases.find((c) => c.id === reviewBatch.reimbursement_id) ?? null : null}
         onClose={() => setReviewBatch(null)}
         onDecided={refresh}
-      />
-      <VendorFormModal
-        open={vendorFormOpen}
-        vendor={editingVendor}
-        onClose={() => setVendorFormOpen(false)}
-        onSaved={async () => {
-          await reloadVendors();
-          toast('Vendor saved');
-        }}
-      />
-      <VendorImportModal
-        open={vendorImportOpen}
-        onClose={() => setVendorImportOpen(false)}
-        onImported={reloadVendors}
       />
     </div>
   );
