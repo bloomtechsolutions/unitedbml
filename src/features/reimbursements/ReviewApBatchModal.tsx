@@ -21,20 +21,29 @@ function isImage(type: string | null | undefined, path: string | null | undefine
 }
 
 function AttachmentPreview({ path, name, type }: { path: string; name: string | null; type: string | null }) {
+  const [shown, setShown] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    setUrl(null);
+  const handleView = () => {
+    setShown(true);
+    if (url) return;
+    setLoading(true);
     void evidenceUrl(path).then((u) => {
-      if (active) setUrl(u);
+      setUrl(u);
+      setLoading(false);
     });
-    return () => {
-      active = false;
-    };
-  }, [path]);
+  };
 
-  if (!url) return <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Loading preview…</p>;
+  if (!shown) {
+    return (
+      <button type="button" className="ub-btn ub-btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }} onClick={handleView}>
+        View {name || 'attachment'}
+      </button>
+    );
+  }
+
+  if (loading || !url) return <p style={{ fontSize: 12, color: 'var(--ub-ink-faint)' }}>Loading preview…</p>;
 
   return (
     <div>
@@ -44,10 +53,13 @@ function AttachmentPreview({ path, name, type }: { path: string; name: string | 
       {isImage(type, path) && !isPdf(type, path) && (
         <img src={url} alt={name || 'Attachment'} style={{ maxWidth: '100%', borderRadius: 10, border: '1px solid var(--ub-border)' }} />
       )}
-      <div style={{ marginTop: 6 }}>
+      <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
         <a href={url} target="_blank" rel="noreferrer" className="ub-btn ub-btn-ghost" style={{ fontSize: 12, padding: '5px 10px', display: 'inline-flex' }}>
           Open {name || 'attachment'} in new tab
         </a>
+        <button type="button" className="ub-btn ub-btn-ghost" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => setShown(false)}>
+          Hide
+        </button>
       </div>
     </div>
   );
