@@ -108,11 +108,17 @@ export function useDashboard(profile: Profile | null) {
 
   const openReimbursements = useMemo(
     () =>
-      reimbursementCases.filter((c) => {
-        const batchesForCase = apBatches.filter((b) => b.reimbursement_id === c.id);
-        if (!batchesForCase.length) return true;
-        return batchesForCase.some((b) => b.status !== 'Paid' && b.status !== 'Cancelled');
-      }),
+      reimbursementCases
+        // Once a procurement group is approved, its items live on as their own line-level case
+        // rows — the original group row stays in the table too (now just a superseded parent),
+        // so it must be excluded or it duplicates its own line case here. Mirrors the same filter
+        // applied in ReimbursementsPage and useStaffReimbursementWorkspace.
+        .filter((c) => !c.data?.isProcurementGroup)
+        .filter((c) => {
+          const batchesForCase = apBatches.filter((b) => b.reimbursement_id === c.id);
+          if (!batchesForCase.length) return true;
+          return batchesForCase.some((b) => b.status !== 'Paid' && b.status !== 'Cancelled');
+        }),
     [reimbursementCases, apBatches]
   );
 
