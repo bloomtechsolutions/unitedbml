@@ -148,30 +148,32 @@ function CaseRow({
                   <div style={{ fontSize: 12, color: 'var(--ub-ink-faint)', marginBottom: 8 }}>Committee remarks: {batch.status_remarks}</div>
                 )}
 
-                <table className="ub-table" style={{ fontSize: 12.5 }}>
-                  <thead>
-                    <tr>
-                      <th>Bill Date</th>
-                      <th>Vendor</th>
-                      <th>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batch.bills.map((bill) => (
-                      <tr key={bill.id}>
-                        <td>{bill.bill_date || '—'}</td>
-                        <td>{bill.vendor_name || '—'}</td>
-                        <td>{money(bill.amount)}</td>
+                <div className="ub-table-boxed-wrap">
+                  <table className="ub-table" style={{ fontSize: 12.5 }}>
+                    <thead>
+                      <tr>
+                        <th>Bill Date</th>
+                        <th>Vendor</th>
+                        <th>Amount</th>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{ fontWeight: 700 }}>
-                      <td colSpan={2}>Total</td>
-                      <td>{money(batch.bills.reduce((s, b) => s + b.amount, 0))}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                    </thead>
+                    <tbody>
+                      {batch.bills.map((bill) => (
+                        <tr key={bill.id}>
+                          <td>{bill.bill_date || '—'}</td>
+                          <td>{bill.vendor_name || '—'}</td>
+                          <td>{money(bill.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ fontWeight: 700 }}>
+                        <td colSpan={2}>Total</td>
+                        <td>{money(batch.bills.reduce((s, b) => s + b.amount, 0))}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             );
           })}

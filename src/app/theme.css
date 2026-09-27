@@ -311,6 +311,17 @@
 .ub-table tbody tr.ub-row-clickable { cursor: pointer; }
 .ub-table tbody tr.ub-row-clickable:hover td { background: var(--ub-surface-2); }
 
+/* Fully-boxed variant of .ub-table — an outer border plus vertical dividers between columns,
+   for a small standalone data table (e.g. a bill submission) that needs to read clearly as a
+   table rather than blend into the surrounding card like the plain variant does. */
+.ub-table-boxed-wrap { border: 1px solid var(--ub-border); border-radius: var(--ub-radius); overflow: hidden; }
+.ub-table-boxed-wrap .ub-table th,
+.ub-table-boxed-wrap .ub-table td { border-right: 1px solid var(--ub-border-2); padding-left: 12px; }
+.ub-table-boxed-wrap .ub-table th:last-child,
+.ub-table-boxed-wrap .ub-table td:last-child { border-right: none; }
+.ub-table-boxed-wrap .ub-table th { background: var(--ub-surface-2); padding-top: 10px; padding-bottom: 10px; }
+.ub-table-boxed-wrap .ub-table tfoot td { border-top: 1px solid var(--ub-border); border-bottom: none; }
+
 /* Step tracker (approval chains, lifecycle stages) */
 .ub-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .ub-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
