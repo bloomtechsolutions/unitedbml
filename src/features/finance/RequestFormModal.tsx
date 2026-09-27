@@ -388,10 +388,6 @@ export function RequestFormModal({ open, onClose, onCreated, defaultEventId }: P
             <label>Rate</label>
             <input type="number" min={0} value={line.rate} onChange={(e) => updateLine(i, { rate: Number(e.target.value) })} />
           </div>
-          <div className="field">
-            <label>Vendor</label>
-            <input value={line.vendor} onChange={(e) => updateLine(i, { vendor: e.target.value })} />
-          </div>
           <button className="btn danger" onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}>
             ✕
           </button>

@@ -142,7 +142,8 @@ export function ReviewApBatchModal({ batch, caseItem, onClose, onDecided }: Prop
             <tr>
               <th>Bill Date</th>
               <th>Vendor</th>
-              <th>Worker ID</th>
+              <th>Vendor ID</th>
+              <th>User ID</th>
               <th>Amount</th>
               {attachmentMode === 'Individual' && <th>Attachment</th>}
             </tr>
@@ -155,6 +156,7 @@ export function ReviewApBatchModal({ batch, caseItem, onClose, onDecided }: Prop
                 <tr key={bill.id}>
                   <td>{bill.bill_date || '—'}</td>
                   <td>{bill.vendor_name || '—'}</td>
+                  <td>{bill.vendor_number || '—'}</td>
                   <td>{bill.worker_id || '—'}</td>
                   <td>MVR {money(bill.amount)}</td>
                   {attachmentMode === 'Individual' && (
@@ -166,7 +168,7 @@ export function ReviewApBatchModal({ batch, caseItem, onClose, onDecided }: Prop
           </tbody>
           <tfoot>
             <tr style={{ fontWeight: 700 }}>
-              <td colSpan={3}>Total</td>
+              <td colSpan={4}>Total</td>
               <td colSpan={attachmentMode === 'Individual' ? 2 : 1}>MVR {money(billsTotal)}</td>
             </tr>
           </tfoot>

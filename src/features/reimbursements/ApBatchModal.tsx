@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import { useToast } from '../../lib/ToastContext';
 import type { ApBillRow, VendorMasterRow } from '../../types/database';
 import { ATTACHMENT_MODES } from './types';
 import type { ApBatchWithBills, AttachmentMode, ProcurementGroupCase } from './types';
 import { apCommittedTotal, saveApBatchDraft, sendApBatch, uploadBatchAttachment, useVendorSearch } from './useReimbursements';
+import { VendorFormModal } from './VendorFormModal';
 
 type DraftBill = Omit<ApBillRow, 'id' | 'ap_batch_id'> & { _key: string; _file?: File };
 
@@ -24,7 +26,15 @@ function emptyBill(): DraftBill {
   };
 }
 
-function VendorField({ bill, onChange }: { bill: DraftBill; onChange: (patch: Partial<DraftBill>) => void }) {
+function VendorField({
+  bill,
+  onChange,
+  onAddVendor,
+}: {
+  bill: DraftBill;
+  onChange: (patch: Partial<DraftBill>) => void;
+  onAddVendor: (prefillName: string) => void;
+}) {
   const [query, setQuery] = useState(bill.vendor_name ?? '');
   const [open, setOpen] = useState(false);
   const results = useVendorSearch(query);
@@ -36,22 +46,26 @@ function VendorField({ bill, onChange }: { bill: DraftBill; onChange: (patch: Pa
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', display: 'flex', gap: 6 }}>
       <input
         value={query}
         placeholder="Search vendor…"
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
-          onChange({ vendor_number: null, vendor_name: e.target.value, worker_id: null });
+          onChange({ vendor_name: e.target.value });
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
-      {open && results.length > 0 && (
+      <button type="button" className="btn ghost" style={{ flexShrink: 0 }} onMouseDown={(e) => e.preventDefault()} onClick={() => onAddVendor(query)}>
+        + Add Vendor
+      </button>
+      {open && (
         <div
           style={{
             position: 'absolute',
+            top: '100%',
             zIndex: 10,
             background: '#fff',
             border: '1px solid var(--line)',
@@ -71,6 +85,11 @@ function VendorField({ bill, onChange }: { bill: DraftBill; onChange: (patch: Pa
               {v.name} — {v.vendor_account}
             </div>
           ))}
+          {!results.length && (
+            <div style={{ padding: 8, fontSize: 12, color: 'var(--muted)' }}>
+              No vendors match — use + Add Vendor to create one.
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -87,8 +106,10 @@ interface Props {
 
 export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSaved }: Props) {
   const { profile, session, isCommitteeUser } = useAuth();
+  const toast = useToast();
   const [bills, setBills] = useState<DraftBill[]>([emptyBill()]);
   const [apEmail, setApEmail] = useState('');
+  const [addVendorFor, setAddVendorFor] = useState<{ key: string; name: string } | null>(null);
   const [attachmentMode, setAttachmentMode] = useState<AttachmentMode>('Combined');
   const [combinedFile, setCombinedFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -265,12 +286,30 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
           </div>
           <div className="field">
             <label>Vendor</label>
-            <VendorField bill={bill} onChange={(patch) => updateBill(bill._key, patch)} />
+            <VendorField
+              bill={bill}
+              onChange={(patch) => updateBill(bill._key, patch)}
+              onAddVendor={(name) => setAddVendorFor({ key: bill._key, name })}
+            />
           </div>
           {isCommitteeUser && (
             <div className="field">
-              <label>Worker ID</label>
-              <input value={bill.worker_id ?? ''} readOnly />
+              <label>Vendor ID</label>
+              <input
+                value={bill.vendor_number ?? ''}
+                onChange={(e) => updateBill(bill._key, { vendor_number: e.target.value || null })}
+                disabled={readOnlyForManager}
+              />
+            </div>
+          )}
+          {isCommitteeUser && (
+            <div className="field">
+              <label>User ID</label>
+              <input
+                value={bill.worker_id ?? ''}
+                onChange={(e) => updateBill(bill._key, { worker_id: e.target.value || null })}
+                disabled={readOnlyForManager}
+              />
             </div>
           )}
           <div className="field">
@@ -374,6 +413,26 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
           </button>
         )}
       </div>
+
+      <VendorFormModal
+        open={!!addVendorFor}
+        vendor={null}
+        initialName={addVendorFor?.name}
+        onClose={() => setAddVendorFor(null)}
+        onSaved={async () => {
+          if (!addVendorFor) return;
+          const { data } = await supabase
+            .from('vendor_master')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data) {
+            updateBill(addVendorFor.key, { vendor_number: data.vendor_account, vendor_name: data.name, worker_id: data.worker_id });
+          }
+          toast('Vendor added');
+        }}
+      />
     </Modal>
   );
 }

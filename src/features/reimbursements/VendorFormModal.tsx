@@ -10,9 +10,12 @@ interface Props {
   vendor: VendorMasterRow | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  /** Prefills Name when creating a new vendor from elsewhere in the app (e.g. an AP bill's
+   * Vendor field with no match yet) — ignored when editing an existing vendor. */
+  initialName?: string;
 }
 
-export function VendorFormModal({ open, vendor, onClose, onSaved }: Props) {
+export function VendorFormModal({ open, vendor, onClose, onSaved, initialName }: Props) {
   const [vendorAccount, setVendorAccount] = useState('');
   const [name, setName] = useState('');
   const [workerId, setWorkerId] = useState('');
@@ -23,12 +26,12 @@ export function VendorFormModal({ open, vendor, onClose, onSaved }: Props) {
   useEffect(() => {
     if (open) {
       setVendorAccount(vendor?.vendor_account ?? '');
-      setName(vendor?.name ?? '');
+      setName(vendor?.name ?? initialName ?? '');
       setWorkerId(vendor?.worker_id ?? '');
       setStatus(vendor?.status ?? 'Active');
       setError(null);
     }
-  }, [open, vendor]);
+  }, [open, vendor, initialName]);
 
   if (!open) return null;
 
