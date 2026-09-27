@@ -27,7 +27,11 @@ export function useStaffReimbursementWorkspace() {
 
   const summaries = useMemo<ManagedEventSummary[]>(() => {
     return events.map((event) => {
-      const eventCases = cases.filter((c) => c.event_id === event.id);
+      // Once a procurement group is approved, its items live on as their own line-level case
+      // rows (created by recordProcurementResponse) — the original group row stays in the table
+      // too (now just a superseded parent), so it must be excluded here or its total double-counts
+      // and duplicates the line case in the UI. Mirrors ReimbursementsPage's own lineCases filter.
+      const eventCases = cases.filter((c) => c.event_id === event.id && !c.data?.isProcurementGroup);
       const eventEligible = eligible.filter((e) => e.eventId === event.id);
       const approvedFromCases = eventCases.reduce((s, c) => s + c.approved_item_amount, 0);
       const approvedFromEligible = eventEligible.reduce((s, r) => s + r.lines.reduce((ss, l) => ss + l.amount, 0), 0);
