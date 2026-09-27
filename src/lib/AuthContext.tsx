@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         loading,
-        isAdministrator: profile?.role === 'Administrator',
+        isAdministrator: profile?.role === 'Administrator' || profile?.is_administrator === true,
         isCommitteeUser,
         committeeChecked,
         signOut,

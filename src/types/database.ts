@@ -11,6 +11,9 @@ export interface Profile {
   email: string | null;
   full_name: string;
   role: UserRole;
+  /** Grants Administrator access on top of whatever committee-position role string is set above
+   * (e.g. 'Secretary') — set for a user who needs both, without overwriting their role label. */
+  is_administrator: boolean;
   committee_slot: string | null;
   status: string;
   member_uid: string | null;
