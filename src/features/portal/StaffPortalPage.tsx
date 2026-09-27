@@ -155,6 +155,7 @@ function CaseRow({
                         <th>Bill Date</th>
                         <th>Vendor</th>
                         <th>Amount</th>
+                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -163,6 +164,11 @@ function CaseRow({
                           <td>{bill.bill_date || '—'}</td>
                           <td>{bill.vendor_name || '—'}</td>
                           <td>{money(bill.amount)}</td>
+                          <td>
+                            <span className={`ub-pill ${info.pillClass}`} style={{ fontSize: 11 }}>
+                              {info.label}
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -170,6 +176,7 @@ function CaseRow({
                       <tr style={{ fontWeight: 700 }}>
                         <td colSpan={2}>Total</td>
                         <td>{money(batch.bills.reduce((s, b) => s + b.amount, 0))}</td>
+                        <td></td>
                       </tr>
                     </tfoot>
                   </table>
