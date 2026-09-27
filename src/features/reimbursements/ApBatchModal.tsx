@@ -253,8 +253,8 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
       </div>
 
       {bills.map((bill) => (
-        <div key={bill._key} className="ap-bill-row">
-          <div className="field">
+        <div key={bill._key} className="ap-bill-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'end', gap: 10 }}>
+          <div className="field" style={{ flex: '1 1 140px', minWidth: 140 }}>
             <label>Bill Date</label>
             <input
               type="date"
@@ -263,12 +263,12 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
               disabled={readOnlyForManager}
             />
           </div>
-          <div className="field">
+          <div className="field" style={{ flex: '2 1 200px', minWidth: 180 }}>
             <label>Vendor</label>
             <VendorField bill={bill} onChange={(patch) => updateBill(bill._key, patch)} />
           </div>
           {isCommitteeUser && (
-            <div className="field">
+            <div className="field" style={{ flex: '1 1 110px', minWidth: 110 }}>
               <label>Vendor ID</label>
               <input
                 value={bill.vendor_number ?? ''}
@@ -278,7 +278,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
             </div>
           )}
           {isCommitteeUser && (
-            <div className="field">
+            <div className="field" style={{ flex: '1 1 110px', minWidth: 110 }}>
               <label>User ID</label>
               <input
                 value={bill.worker_id ?? ''}
@@ -287,7 +287,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
               />
             </div>
           )}
-          <div className="field">
+          <div className="field" style={{ flex: '1 1 120px', minWidth: 120 }}>
             <label>Amount</label>
             <input
               type="number"
@@ -298,7 +298,7 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
             />
           </div>
           {attachmentMode === 'Individual' && (
-            <div className="field">
+            <div className="field" style={{ flex: '2 1 220px', minWidth: 200 }}>
               <label>Attachment</label>
               <input
                 type="file"
@@ -310,7 +310,11 @@ export function ApBatchModal({ caseItem, existingBatch, batches, onClose, onSave
             </div>
           )}
           {!readOnlyForManager && (
-            <button className="btn danger" onClick={() => setBills((prev) => prev.filter((b) => b._key !== bill._key))}>
+            <button
+              className="btn danger"
+              style={{ flex: '0 0 auto' }}
+              onClick={() => setBills((prev) => prev.filter((b) => b._key !== bill._key))}
+            >
               Remove
             </button>
           )}
