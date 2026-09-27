@@ -129,16 +129,17 @@ function CaseRow({
           {history.map((batch, i) => {
             const info = batchStatusInfo(batch);
             return (
-              <div key={batch.id} style={{ marginBottom: i < history.length - 1 ? 14 : 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ub-ink-faint)' }}>
+              <details key={batch.id} className="doc-folder" open={i === 0} style={{ marginBottom: i < history.length - 1 ? 10 : 0 }}>
+                <summary className="doc-folder-summary" style={{ justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ub-ink-faint)' }}>
                     Submission {history.length - i} · {batch.submission_ref}
-                  </div>
+                  </span>
                   <span className={`ub-pill ${info.pillClass}`} style={{ fontSize: 11 }}>
                     {info.label}
                   </span>
-                </div>
+                </summary>
 
+                <div style={{ padding: '12px 16px 16px' }}>
                 {batch.return_reason && (
                   <div className="ub-banner ub-banner-warning" style={{ marginBottom: 8 }}>
                     Returned by {batch.returned_by || 'the committee'}: {batch.return_reason}
@@ -181,7 +182,8 @@ function CaseRow({
                     </tfoot>
                   </table>
                 </div>
-              </div>
+                </div>
+              </details>
             );
           })}
         </div>
