@@ -5,6 +5,7 @@ import { PageInfoPanel } from '../../components/PageInfoPanel';
 import { useToast } from '../../lib/ToastContext';
 import type { EventRow } from '../../types/database';
 import { useEventFinanceSummary } from '../finance/useFinance';
+import { ActivityListView } from './ActivityListView';
 import { EventCalendar } from './EventCalendar';
 import { EventDetailModal } from './EventDetailModal';
 import { EventFormModal } from './EventFormModal';
@@ -30,6 +31,10 @@ const CALENDAR_INFO = [
     a: 'Open the day, find the placeholder, and click Promote to Event — it opens the full Create Event form pre-filled with the name and date. The placeholder is then linked to the new event and stops showing as a separate item.',
   },
   {
+    q: 'What is By Activity?',
+    a: 'A flat, sortable list of every event and planned activity for a chosen year with its date, type, venue, coordinator and status — useful when you want to scan the whole year at once instead of clicking through months.',
+  },
+  {
     q: 'Where do the public holidays come from?',
     a: "A committee-maintained list (Manage Holidays button). Fixed-date holidays don't change, but Islamic-calendar ones (Eid, Hajj Day, National Day, Mawlid) shift every year with moon sighting — update them here once officially confirmed.",
   },
@@ -44,7 +49,7 @@ export function EventCalendarPage() {
   const { holidays, reload: reloadHolidays } = usePublicHolidays();
   const toast = useToast();
 
-  const [view, setView] = useState<'calendar' | 'info'>('calendar');
+  const [view, setView] = useState<'calendar' | 'list' | 'info'>('calendar');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [plannedModalOpen, setPlannedModalOpen] = useState(false);
   const [plannedDefaultDate, setPlannedDefaultDate] = useState('');
@@ -133,12 +138,28 @@ export function EventCalendarPage() {
         <button className={`tab ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')}>
           Calendar
         </button>
+        <button className={`tab ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')}>
+          By Activity
+        </button>
         <button className={`tab ${view === 'info' ? 'active' : ''}`} onClick={() => setView('info')}>
           Info
         </button>
       </div>
 
       {view === 'info' && <PageInfoPanel sections={CALENDAR_INFO} />}
+
+      {view === 'list' && (
+        <ActivityListView
+          events={enriched}
+          placeholders={activities}
+          onOpenEvent={setDetailId}
+          onPromotePlaceholder={(activity) => {
+            setPromoting(activity);
+            setFormOpen(true);
+          }}
+          onDeletePlaceholder={(id) => void handleDeletePlaceholder(id)}
+        />
+      )}
 
       {view === 'calendar' && (
         <EventCalendar
